@@ -58,8 +58,8 @@ def edit_message(chat_id, message_id, text, reply_markup=None):
     return api_request("editMessageText", payload)
 
 
-def send_animation(chat_id, emoji):
-    return api_request("sendDice", {"chat_id": chat_id, "emoji": emoji})
+def send_dice_result(chat_id, emoji, value):
+    return send_message(chat_id, f"{emoji} <b>{value}</b>")
 
 
 def answer_callback(callback_id, text=None):
@@ -186,6 +186,8 @@ def send_crypto_payout(chat_id, msg_id, amount_dollars, target_tg_id):
             err_msg = "Пользователь не найден. Ему нужно открыть @CryptoBot."
         elif error_name == "NOT_ENOUGH_FUNDS":
             err_msg = "На балансе приложения в CryptoBot не хватает денег."
+        elif error_name == "FORBIDDEN" or "403" in str(error_name):
+            err_msg = "Вывод отключён в настройках приложения CryptoBot (включите Transfer)."
         send_message(chat_id, f"❌ <b>Ошибка выплаты!</b>\n\n<i>{err_msg} ({error_name})</i>",
                      {"inline_keyboard": [[{"text": "⬅️ Назад", "callback_data": "profile"}]]})
 
@@ -382,8 +384,6 @@ def get_choice_menu(user, game, bet):
         ]
     kb.append([{"text": "⬅️ Назад", "callback_data": f"game_{game}"}])
     return text, {"inline_keyboard": kb}
-
-
 # ============================================================
 # ИГРЫ
 # ============================================================
@@ -404,10 +404,10 @@ def resolve_game(chat_id, game, bet, choice):
 
     elif game in ("dice", "turbo"):
         if choice in ("three_high", "three_six"):
-            d1, d2, d3 = random.randint(1,6), random.randint(1,6), random.randint(1,6)
-            send_animation(chat_id, "🎲"); time.sleep(1)
-            send_animation(chat_id, "🎲"); time.sleep(1)
-            send_animation(chat_id, "🎲"); time.sleep(1.5)
+            d1, d2, d3 = random.randint(1, 6), random.randint(1, 6), random.randint(1, 6)
+            send_dice_result(chat_id, "🎲", d1); time.sleep(0.5)
+            send_dice_result(chat_id, "🎲", d2); time.sleep(0.5)
+            send_dice_result(chat_id, "🎲", d3); time.sleep(0.5)
             total = d1 + d2 + d3
             res_detail = f"Выпало: {d1}, {d2}, {d3} (Сумма: {total})\n"
             if choice == "three_high" and total > 10:
@@ -415,10 +415,10 @@ def resolve_game(chat_id, game, bet, choice):
             elif choice == "three_six" and d1 == d2 == d3 == 6:
                 win, multiplier = True, 50.0
         elif choice in ("turbo_high", "turbo_low"):
-            d1, d2, d3 = random.randint(1,6), random.randint(1,6), random.randint(1,6)
-            send_animation(chat_id, "🎲"); time.sleep(1)
-            send_animation(chat_id, "🎲"); time.sleep(1)
-            send_animation(chat_id, "🎲"); time.sleep(1.5)
+            d1, d2, d3 = random.randint(1, 6), random.randint(1, 6), random.randint(1, 6)
+            send_dice_result(chat_id, "🎲", d1); time.sleep(0.5)
+            send_dice_result(chat_id, "🎲", d2); time.sleep(0.5)
+            send_dice_result(chat_id, "🎲", d3); time.sleep(0.5)
             res_detail = f"Выпало: {d1}, {d2}, {d3}\n"
             if choice == "turbo_high" and d1 > 3 and d2 > 3 and d3 > 3:
                 win, multiplier = True, 5.0
@@ -426,7 +426,7 @@ def resolve_game(chat_id, game, bet, choice):
                 win, multiplier = True, 5.0
         else:
             val = random.randint(1, 6)
-            send_animation(chat_id, "🎲"); time.sleep(2)
+            send_dice_result(chat_id, "🎲", val); time.sleep(1)
             res_detail = f"Выпало: {val}\n"
             if choice.isdigit() and int(choice) == val:
                 win, multiplier = True, 5.0
@@ -436,8 +436,8 @@ def resolve_game(chat_id, game, bet, choice):
                 win, multiplier = True, 2.0
 
     elif game == "custom":
-        send_animation(chat_id, "🎲"); time.sleep(2)
         val = random.randint(1, 100)
+        send_dice_result(chat_id, "🎲", val); time.sleep(1)
         res_detail = f"Рулетка судьбы: {val}/100\n"
         if choice == "jackpot" and val > 90:
             win, multiplier = True, 10.0
@@ -446,15 +446,16 @@ def resolve_game(chat_id, game, bet, choice):
 
     elif game == "mini":
         val = random.choice(["heads", "tails"])
-        send_animation(chat_id, "🎲"); time.sleep(2)
-        res_detail = f"Выпало: {'Орёл' if val == 'heads' else 'Решка'}\n"
+        emoji_val = "🦅 Орёл" if val == "heads" else "🪙 Решка"
+        send_message(chat_id, emoji_val); time.sleep(1)
+        res_detail = f"Выпало: {emoji_val}\n"
         if choice == val:
             win, multiplier = True, 2.0
 
     elif game == "football":
         val = random.randint(1, 5)
-        send_animation(chat_id, "⚽"); time.sleep(2)
-        res_detail = "Матч окончен.\n"
+        send_dice_result(chat_id, "⚽", val); time.sleep(1)
+        res_detail = f"Результат удара: {val}/5\n"
         if choice == "goal" and val >= 3:
             win, multiplier = True, 1.5
         elif choice == "miss" and val < 3:
@@ -462,8 +463,8 @@ def resolve_game(chat_id, game, bet, choice):
 
     elif game == "basketball":
         val = random.randint(1, 10)
-        send_animation(chat_id, "🏀"); time.sleep(2)
-        res_detail = "Бросок выполнен.\n"
+        send_dice_result(chat_id, "🏀", val); time.sleep(1)
+        res_detail = f"Бросок: {val}/10\n"
         if choice == "2pt" and val <= 6:
             win, multiplier = True, 1.5
         elif choice == "3pt" and val > 6:
@@ -471,18 +472,18 @@ def resolve_game(chat_id, game, bet, choice):
 
     elif game == "darts":
         val = random.randint(1, 6)
-        send_animation(chat_id, "🎯"); time.sleep(2)
-        res_detail = "Дротик брошен.\n"
+        send_dice_result(chat_id, "🎯", val); time.sleep(1)
+        res_detail = f"Сектор: {val}/6\n"
         if choice == "bull" and val == 1:
             win, multiplier = True, 3.0
         elif choice == "miss" and val > 1:
             win, multiplier = True, 1.5
 
     elif game == "bowling":
-        val = random.choices([0,1,2,3,4,5,6,7,8,9,10],
-                             weights=[15,5,10,15,15,10,10,5,5,3,7])[0]
-        send_animation(chat_id, "🎳"); time.sleep(2)
-        res_detail = f"Сбито кеглей: {val}\n"
+        val = random.choices([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                             weights=[15, 5, 10, 15, 15, 10, 10, 5, 5, 3, 7])[0]
+        send_dice_result(chat_id, "🎳", val); time.sleep(1)
+        res_detail = f"Сбито кеглей: {val}/10\n"
         if choice == "strike" and val == 10:
             win, multiplier = True, 5.0
         elif choice == "high" and 7 <= val <= 9:
@@ -493,8 +494,10 @@ def resolve_game(chat_id, game, bet, choice):
             win, multiplier = True, 4.0
 
     return win, multiplier, res_detail
+
+
 # ============================================================
-# MAIN LOOP
+# MAIN LOOP — часть 1: старт, платежи, callback
 # ============================================================
 print("Бот запущен...")
 offset = 0
@@ -511,13 +514,11 @@ while True:
         for update in updates["result"]:
             offset = update["update_id"] + 1
 
-            # --- PRE CHECKOUT ---
             if "pre_checkout_query" in update:
                 api_request("answerPreCheckoutQuery", {
                     "pre_checkout_query_id": update["pre_checkout_query"]["id"], "ok": True})
                 continue
 
-            # --- SUCCESSFUL PAYMENT ---
             if "message" in update and "successful_payment" in update["message"]:
                 msg = update["message"]
                 chat_id = msg["chat"]["id"]
@@ -536,7 +537,6 @@ while True:
                     print("successful_payment:", e)
                 continue
 
-            # --- CALLBACK ---
             if "callback_query" in update:
                 cb = update["callback_query"]
                 cb_id = cb["id"]
@@ -645,12 +645,13 @@ while True:
                             edit_message(chat_id, msg_id, t, k)
                     elif data.startswith("res_"):
                         parts = data.split("_")
-                        game = parts[1]
+                        game = parts[1] if len(parts) > 1 else ""
                         try:
-                            bet = float(parts[2])
+                            bet = float(parts[2]) if len(parts) > 2 else 0
                         except ValueError:
                             bet = 0
-                        choice = parts[3]
+                        choice = parts[3] if len(parts) > 3 else ""
+
                         if bet > user["balance"] or bet < MIN_BET:
                             edit_message(chat_id, msg_id, "❌ Ставка недействительна.",
                                          {"inline_keyboard": [[{"text": "⬅️ Назад", "callback_data": "main_menu"}]]})
@@ -661,25 +662,26 @@ while True:
 
                         if win:
                             win_amount = round(bet * multiplier, 2)
-                            new_bal = round(user["balance"] + win_amount - bet, 2)
+                            profit = round(win_amount - bet, 2)
+                            new_bal = round(user["balance"] + profit, 2)
                             update_user(user_id, balance=new_bal, wins=user["wins"] + 1)
-                            res_text = (f"🎉 Победа!\n{res_detail}"
-                                        f"Вы получили: +{win_amount}$ 💵\n"
-                                        f"Чистая прибыль: +{round(win_amount - bet, 2)}$\n\n")
+                            res_text = (f"🎉 <b>Победа!</b>\n{res_detail}"
+                                        f"💵 Выплата: <b>+{win_amount}$</b> (включая ставку)\n"
+                                        f"📈 Чистая прибыль: <b>+{profit}$</b>\n\n")
                         else:
                             new_bal = round(user["balance"] - bet, 2)
                             update_user(user_id, balance=new_bal, losses=user["losses"] + 1)
-                            res_text = f"😢 Проигрыш.\n{res_detail}Потеряно: -{bet}$ 💵\n\n"
+                            res_text = f"😢 <b>Проигрыш.</b>\n{res_detail}Потеряно: <b>-{bet}$</b>\n\n"
 
-                        text, kb = get_main_menu(get_user(user_id))
+                                                text, kb = get_main_menu(get_user(user_id))
                         send_message(chat_id, res_text + text, kb)
 
                 except Exception as e:
-                    print("Callback error:", e)
+                     print("Callback error:", e)                   
                 continue
 
             # --- TEXT MESSAGE ---
-            if "message" in update and "text" in update["message"]:
+              if "message" in update and "text" in update["message"]:                
                 msg = update["message"]
                 chat_id = msg["chat"]["id"]
                 text_str = msg["text"].strip()
@@ -691,7 +693,6 @@ while True:
                 if not text_str:
                     continue
 
-                # /start всегда выводит из состояния
                 cmd = text_str.lower().split()[0]
                 if cmd in ("/start", "/help"):
                     user_states.pop(user_id, None)
@@ -737,3 +738,4 @@ while True:
     except Exception as e:
         print("Main loop error:", e)
         time.sleep(2)
+                            
