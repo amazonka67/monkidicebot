@@ -94,7 +94,7 @@ def update_user(uid, **kwargs):
 
 # --- МЕНЮ ---
 
-def get_main_menu(user):
+def get_games_menu(user):
     text = (
         f"👤 <b>{user['name']}</b>\n"
         f"💰 Баланс: <b>{user['balance']}$</b> 💵\n"
@@ -106,7 +106,24 @@ def get_main_menu(user):
             [{"text": "🎲 Дайс", "callback_data": "game_dice"}, {"text": "🔢 Чет/Нечет", "callback_data": "game_evenodd"}, {"text": "🎯 Дартс", "callback_data": "game_darts"}],
             [{"text": "⚽ Футбол", "callback_data": "game_football"}, {"text": "🏀 Баскет", "callback_data": "game_basketball"}, {"text": "🎳 Боулинг", "callback_data": "game_bowling"}],
             [{"text": "🎰 Слоты", "callback_data": "game_slots"}, {"text": "🪙 Монетка", "callback_data": "game_coin"}],
-            [{"text": "💰 Баланс", "callback_data": "profile"}, {"text": "🎁 Бонус", "callback_data": "bonus"}, {"text": "💎 Купить $", "callback_data": "shop"}]
+            [{"text": "📱 Главное меню", "callback_data": "main_menu"}] # Кнопка перехода в главное меню
+        ]
+    }
+    return text, kb
+
+def get_main_menu(user):
+    text = (
+        f"👋 Привет, <b>{user['name']}</b>!\n\n"
+        f"💵 <b>Баланс:</b> {user['balance']}$\n"
+        f"📊 <b>Ваш оборот:</b> {user['wins'] + user['losses']}$ (кол-во игр)\n\n"
+        f"<b>Выберите нужный раздел:</b>"
+    )
+    kb = {
+        "inline_keyboard": [
+            [{"text": "🎮 Играть", "callback_data": "games_menu"}],
+            [{"text": "👤 Профиль", "callback_data": "profile"}, {"text": "🎁 Бонусы", "callback_data": "bonus"}],
+            [{"text": "💎 Купить $", "callback_data": "shop"}, {"text": "🏆 Топ", "callback_data": "top"}],
+            [{"text": "ℹ️ Информация", "callback_data": "info"}]
         ]
     }
     return text, kb
@@ -114,8 +131,7 @@ def get_main_menu(user):
 def get_shop_menu(user):
     text = (
         f"💎 <b>Магазин валюты</b>\n\n"
-        f"Здесь вы можете пополнить свой баланс долларов за Telegram Stars.\n"
-        f"Ваш текущий баланс: <b>{user['balance']}$</b> 💵\n\n"
+        f"Ваш баланс: <b>{user['balance']}$</b> 💵\n\n"
         f"Выберите пакет:"
     )
     kb = {
@@ -123,8 +139,7 @@ def get_shop_menu(user):
             [{"text": "100$ за 10 ⭐", "callback_data": "buy_100_10"}],
             [{"text": "500$ за 40 ⭐", "callback_data": "buy_500_40"}],
             [{"text": "1000$ за 70 ⭐", "callback_data": "buy_1000_70"}],
-            [{"text": "5000$ за 300 ⭐", "callback_data": "buy_5000_300"}],
-            [{"text": "⬅️ Назад", "callback_data": "menu"}]
+            [{"text": "⬅️ Назад", "callback_data": "main_menu"}]
         ]
     }
     return text, kb
@@ -145,7 +160,7 @@ def get_bet_menu(user, game):
         "inline_keyboard": [
             [{"text": "10$", "callback_data": f"bet_{game}_10"}, {"text": "50$", "callback_data": f"bet_{game}_50"}, {"text": "100$", "callback_data": f"bet_{game}_100"}],
             [{"text": "500$", "callback_data": f"bet_{game}_500"}, {"text": "✍️ Своя", "callback_data": f"custom_{game}"}, {"text": "Макс", "callback_data": f"bet_{game}_{user['balance']}"}],
-            [{"text": "⬅️ Назад", "callback_data": "menu"}]
+            [{"text": "⬅️ Назад", "callback_data": "games_menu"}]
         ]
     }
     return text, kb
@@ -221,7 +236,6 @@ while True:
         for update in updates["result"]:
             offset = update["update_id"] + 1
 
-            # --- ОПЛАТА ЗВЕЗДАМИ ---
             if "pre_checkout_query" in update:
                 pcq = update["pre_checkout_query"]
                 api_request("answerPreCheckoutQuery", {"pre_checkout_query_id": pcq["id"], "ok": True})
@@ -242,7 +256,6 @@ while True:
                     send_message(chat_id, f"✅ Оплата прошла успешно!\nВам начислено <b>{dollars}$</b> 💵\nВаш баланс: {new_bal}$")
                 continue
 
-            # --- КНОПКИ ---
             if "callback_query" in update:
                 cb = update["callback_query"]
                 cb_id = cb["id"]
@@ -257,10 +270,31 @@ while True:
                 if user_id in user_states and not data.startswith("res_"):
                     del user_states[user_id]
 
-                if data == "menu":
+                if data == "main_menu" or data == "menu":
                     text, kb = get_main_menu(user)
                     edit_message(chat_id, msg_id, text, kb)
                 
+                elif data == "games_menu":
+                    text, kb = get_games_menu(user)
+                    edit_message(chat_id, msg_id, text, kb)
+                
+                elif data == "info":
+                    text = (
+                        "ℹ️ <b>Информация о боте</b>\n\n"
+                        "Этот бот создан для развлечения. Здесь вы можете играть в мини-игры на виртуальные доллары.\n\n"
+                        "Все выигрыши и проигрыши являются виртуальными. Бот не несет ответственности за ваши действия."
+                    )
+                    edit_message(chat_id, msg_id, text, {"inline_keyboard": [[{"text": "⬅️ Назад", "callback_data": "main_menu"}]]})
+
+                elif data == "top":
+                    data_db = load_data()
+                    sorted_users = sorted(data_db.items(), key=lambda x: x[1]["balance"], reverse=True)[:5]
+                    text = "🏆 <b>Топ 5 игроков:</b>\n\n"
+                    for i, (uid, u_info) in enumerate(sorted_users):
+                        name = u_info.get("name", "Игрок")
+                        text += f"{i+1}. <b>{name}</b> — {u_info['balance']}$ 💵\n"
+                    edit_message(chat_id, msg_id, text, {"inline_keyboard": [[{"text": "⬅️ Назад", "callback_data": "main_menu"}]]})
+
                 elif data == "shop":
                     text, kb = get_shop_menu(user)
                     edit_message(chat_id, msg_id, text, kb)
@@ -271,21 +305,21 @@ while True:
                     stars = int(parts[2])
                     send_stars_invoice(chat_id, msg_id, stars, dollars)
                 
-                elif data == "profile" or data == "balance":
+                elif data == "profile":
                     text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n✅ Побед: {user['wins']}\n❌ Поражений: {user['losses']}"
-                    edit_message(chat_id, msg_id, text, {"inline_keyboard": [[{"text": "⬅️ Назад", "callback_data": "menu"}]]})
+                    edit_message(chat_id, msg_id, text, {"inline_keyboard": [[{"text": "⬅️ Назад", "callback_data": "main_menu"}]]})
                 
                 elif data == "bonus":
                     now = int(time.time())
                     if now - user["last_bonus"] < 86400:
                         left = 86400 - (now - user["last_bonus"])
                         text = f"⏳ Бонус уже получен.\nЖдать: {left//3600}ч {(left%3600)//60}м"
-                        edit_message(chat_id, msg_id, text, {"inline_keyboard": [[{"text": "⬅️ Назад", "callback_data": "menu"}]]})
+                        edit_message(chat_id, msg_id, text, {"inline_keyboard": [[{"text": "⬅️ Назад", "callback_data": "main_menu"}]]})
                     else:
                         new_bal = user["balance"] + 500
                         update_user(user_id, balance=new_bal, last_bonus=now)
                         text = f"🎁 Бонус +500$!\nВаш баланс: {new_bal}$ 💵"
-                        edit_message(chat_id, msg_id, text, {"inline_keyboard": [[{"text": "⬅️ Назад", "callback_data": "menu"}]]})
+                        edit_message(chat_id, msg_id, text, {"inline_keyboard": [[{"text": "⬅️ Назад", "callback_data": "main_menu"}]]})
 
                 elif data.startswith("game_"):
                     game = data.split("_")[1]
@@ -400,10 +434,9 @@ while True:
                         update_user(user_id, balance=new_bal, losses=user["losses"] + 1)
                         res_text = f"😢 <b>Проигрыш.</b>\nПотеряно: <b>-{bet}$</b> 💵\n\n"
                     
-                    text, kb = get_main_menu(get_user(user_id))
+                    text, kb = get_games_menu(get_user(user_id))
                     send_message(chat_id, res_text + text, kb)
 
-            # --- ТЕКСТОВЫЕ КОМАНДЫ ---
             elif "message" in update and "text" in update["message"]:
                 msg = update["message"]
                 chat_id = msg["chat"]["id"]
