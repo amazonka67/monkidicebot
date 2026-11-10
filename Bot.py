@@ -81,86 +81,58 @@ def update_user(uid, **kwargs):
     data[uid].update(kwargs)
     save_data(data)
 
-# --- КЛАВИАТУРА СНИЗУ ---
 def get_bottom_keyboard():
-    return {
-        "keyboard": [
-            [{"text": "💰 Баланс"}, {"text": "🎮 Играть"}, {"text": "📱 Меню"}]
-        ],
-        "resize_keyboard": True,
-        "is_persistent": True
-    }
-
-# --- МЕНЮ ---
+    return {"keyboard": [[{"text": "💰 Баланс"}, {"text": "🎮 Играть"}, {"text": "📱 Меню"}]], "resize_keyboard": True, "is_persistent": True}
 
 def get_main_menu(user):
-    text = (
-        f"👤 <b>{user['name']}</b>\n"
-        f"💰 Баланс: <b>{user['balance']}$</b> 💵\n"
-        f"📈 Статистика: ✅ {user['wins']} | ❌ {user['losses']}\n\n"
-        f"🎰 <b>Выберите игру:</b>"
-    )
-    kb = {
-        "inline_keyboard": [
-            [{"text": "🎲 Дайс", "callback_data": "game_dice"}, {"text": "⚽ Футбол", "callback_data": "game_football"}, {"text": "🏀 Баскет", "callback_data": "game_basketball"}],
-            [{"text": "🎯 Дартс", "callback_data": "game_darts"}, {"text": "🎳 Боулинг", "callback_data": "game_bowling"}, {"text": "🎰 Слоты", "callback_data": "game_slots"}],
-            [{"text": "💰 Баланс", "callback_data": "profile"}, {"text": "🎁 Бонус", "callback_data": "bonus"}, {"text": "💎 Купить $", "callback_data": "shop"}]
-        ]
-    }
+    text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n📈 Статистика: ✅ {user['wins']} | ❌ {user['losses']}\n\n🎰 <b>Выберите игру:</b>"
+    kb = {"inline_keyboard": [
+        [{"text": "🎲 Дайс", "callback_data": "game_dice"}, {"text": "⚽ Футбол", "callback_data": "game_football"}, {"text": "🏀 Баскет", "callback_data": "game_basketball"}],
+        [{"text": "🎯 Дартс", "callback_data": "game_darts"}, {"text": "🎳 Боулинг", "callback_data": "game_bowling"}, {"text": "🎰 Слоты", "callback_data": "game_slots"}],
+        [{"text": "💰 Баланс", "callback_data": "profile"}, {"text": "🎁 Бонус", "callback_data": "bonus"}, {"text": "💎 Купить $", "callback_data": "shop"}]
+    ]}
     return text, kb
 
 def get_shop_menu(user):
     text = f"💎 <b>Магазин валюты</b>\n\nВаш баланс: <b>{user['balance']}$</b> 💵\n\nВыберите пакет:"
-    kb = {
-        "inline_keyboard": [
-            [{"text": "100$ за 10 ⭐", "callback_data": "buy_100_10"}],
-            [{"text": "500$ за 40 ⭐", "callback_data": "buy_500_40"}],
-            [{"text": "1000$ за 70 ⭐", "callback_data": "buy_1000_70"}],
-            [{"text": "⬅️ Назад", "callback_data": "main_menu"}]
-        ]
-    }
+    kb = {"inline_keyboard": [[{"text": "100$ за 10 ⭐", "callback_data": "buy_100_10"}], [{"text": "500$ за 40 ⭐", "callback_data": "buy_500_40"}], [{"text": "⬅️ Назад", "callback_data": "main_menu"}]]}
     return text, kb
 
 def get_bet_menu(user, game):
-    game_names = {
-        "dice": "🎲 Дайс", "darts": "🎯 Дартс", "football": "⚽ Футбол", 
-        "basketball": "🏀 Баскет", "bowling": "🎳 Боулинг", "slots": "🎰 Слоты"
-    }
-    text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n🎮 Игра: <b>{game_names.get(game, game)}</b>\n\n👇 <b>Выберите ставку:</b>"
-    kb = {
-        "inline_keyboard": [
-            [{"text": "10$", "callback_data": f"bet_{game}_10"}, {"text": "50$", "callback_data": f"bet_{game}_50"}, {"text": "100$", "callback_data": f"bet_{game}_100"}],
-            [{"text": "500$", "callback_data": f"bet_{game}_500"}, {"text": "✍️ Своя", "callback_data": f"custom_{game}"}, {"text": "Макс", "callback_data": f"bet_{game}_{user['balance']}"}],
-            [{"text": "⬅️ Назад", "callback_data": "main_menu"}]
-        ]
-    }
+    names = {"dice": "🎲 Дайс", "darts": "🎯 Дартс", "football": "⚽ Футбол", "basketball": "🏀 Баскет", "bowling": "🎳 Боулинг", "slots": "🎰 Слоты"}
+    text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n🎮 Игра: <b>{names.get(game, game)}</b>\n\n👇 <b>Выберите ставку:</b>"
+    kb = {"inline_keyboard": [
+        [{"text": "10$", "callback_data": f"bet_{game}_10"}, {"text": "50$", "callback_data": f"bet_{game}_50"}, {"text": "100$", "callback_data": f"bet_{game}_100"}],
+        [{"text": "✍️ Своя", "callback_data": f"custom_{game}"}, {"text": "Макс", "callback_data": f"bet_{game}_{user['balance']}"}],
+        [{"text": "⬅️ Назад", "callback_data": "main_menu"}]
+    ]}
     return text, kb
 
-def get_choice_menu(user, game, bet):
-    text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n💵 Ставка: <b>{bet}$</b>\n\n🎯 <b>На что ставим?</b>"
+def get_count_menu(user, game, bet):
+    text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n💵 Ставка: <b>{bet}$</b>\n\n🎯 <b>Выберите количество:</b>"
+    kb = {"inline_keyboard": [
+        [{"text": "1 бросок", "callback_data": f"count_{game}_{bet}_1"}, {"text": "2 броска", "callback_data": f"count_{game}_{bet}_2"}, {"text": "3 броска", "callback_data": f"count_{game}_{bet}_3"}],
+        [{"text": "⬅️ Назад", "callback_data": f"game_{game}"}]
+    ]}
+    return text, kb
+
+def get_outcome_menu(user, game, bet, count):
+    text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n💵 Ставка: <b>{bet}$</b>\n🎲 Бросков: <b>{count}</b>\n\n🎯 <b>На что ставим?</b>"
     kb = []
-    
     if game == "dice":
-        kb = [
-            [{"text": "1 (x5)", "callback_data": f"res_{game}_{bet}_1"}, {"text": "2 (x5)", "callback_data": f"res_{game}_{bet}_2"}, {"text": "3 (x5)", "callback_data": f"res_{game}_{bet}_3"}],
-            [{"text": "4 (x5)", "callback_data": f"res_{game}_{bet}_4"}, {"text": "5 (x5)", "callback_data": f"res_{game}_{bet}_5"}, {"text": "6 (x5)", "callback_data": f"res_{game}_{bet}_6"}],
-            [{"text": "⬆️ Больше 3 (x2)", "callback_data": f"res_{game}_{bet}_high"}], 
-            [{"text": "⬇️ Меньше 4 (x2)", "callback_data": f"res_{game}_{bet}_low"}]
-        ]
-    elif game == "football":
-        kb = [[{"text": "✅ Гол (x1.5)", "callback_data": f"res_{game}_{bet}_goal"}], [{"text": "❌ Мимо (x2.5)", "callback_data": f"res_{game}_{bet}_miss"}]]
-    elif game == "basketball":
-        kb = [[{"text": "🏀 2 очка (x1.5)", "callback_data": f"res_{game}_{bet}_2pt"}], [{"text": "🏀 3 очка (x3)", "callback_data": f"res_{game}_{bet}_3pt"}]]
+        kb = [[{"text": "Меньше x2", "callback_data": f"res_{game}_{bet}_{count}_low"}, {"text": "Больше x2", "callback_data": f"res_{game}_{bet}_{count}_high"}], [{"text": "Четное x2", "callback_data": f"res_{game}_{bet}_{count}_even"}, {"text": "Нечетное x2", "callback_data": f"res_{game}_{bet}_{count}_odd"}], [{"text": "Точное 1-6 (x6)", "callback_data": f"res_{game}_{bet}_{count}_exact"}]]
     elif game == "darts":
-        kb = [[{"text": "🎯 В яблочко (x3)", "callback_data": f"res_{game}_{bet}_bull"}], [{"text": "❌ Мимо (x1.5)", "callback_data": f"res_{game}_{bet}_miss"}]]
-    elif game == "slots":
-        kb = [[{"text": "💎 3 в ряд (x16)", "callback_data": f"res_{game}_{bet}_win"}], [{"text": "❌ Не зашло (x2)", "callback_data": f"res_{game}_{bet}_lose"}]]
+        kb = [[{"text": "Сектор x3", "callback_data": f"res_{game}_{bet}_{count}_sector"}, {"text": "Отскок x6", "callback_data": f"res_{game}_{bet}_{count}_bounce"}], [{"text": "Центр x6", "callback_data": f"res_{game}_{bet}_{count}_bull"}, {"text": "Промах x3", "callback_data": f"res_{game}_{bet}_{count}_miss"}]]
     elif game == "bowling":
-        kb = [
-            [{"text": "🎳 Страйк (x5)", "callback_data": f"res_{game}_{bet}_strike"}, {"text": "🎯 7-9 (x2.5)", "callback_data": f"res_{game}_{bet}_high"}],
-            [{"text": "⚪ 1-3 (x1.5)", "callback_data": f"res_{game}_{bet}_low"}, {"text": "❌ Промах (x4)", "callback_data": f"res_{game}_{bet}_miss"}]
-        ]
-    kb.append([{"text": "⬅️ Назад", "callback_data": f"game_{game}"}])
+        kb = [[{"text": "1-3 x2", "callback_data": f"res_{game}_{bet}_{count}_low"}, {"text": "4-6 x3", "callback_data": f"res_{game}_{bet}_{count}_mid"}], [{"text": "Страйк x5", "callback_data": f"res_{game}_{bet}_{count}_strike"}, {"text": "Промах x4", "callback_data": f"res_{game}_{bet}_{count}_miss"}]]
+    elif game == "football":
+        kb = [[{"text": "Гол в центр x5", "callback_data": f"res_{game}_{bet}_{count}_center"}, {"text": "Гол в угол x5", "callback_data": f"res_{game}_{bet}_{count}_corner"}], [{"text": "Любой гол x1.65", "callback_data": f"res_{game}_{bet}_{count}_goal"}], [{"text": "Штанга x2.5", "callback_data": f"res_{game}_{bet}_{count}_post"}, {"text": "Промах x2.5", "callback_data": f"res_{game}_{bet}_{count}_miss"}]]
+    elif game == "basketball":
+        kb = [[{"text": "Точный x2", "callback_data": f"res_{game}_{bet}_{count}_goal"}, {"text": "Кольцо x1.5", "callback_data": f"res_{game}_{bet}_{count}_ring"}], [{"text": "Промах x2.5", "callback_data": f"res_{game}_{bet}_{count}_miss"}]]
+    elif game == "slots":
+        text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n💵 Ставка: <b>{bet}$</b>\n\n🎰 <b>Выберите символ:</b>"
+        kb = [[{"text": "3 семерки x64", "callback_data": f"res_{game}_{bet}_3_seven"}, {"text": "3 лимона x64", "callback_data": f"res_{game}_{bet}_3_lemon"}], [{"text": "Любая комбинация x1.6", "callback_data": f"res_{game}_{bet}_3_any"}]]
+    kb.append([{"text": "⬅️ Назад", "callback_data": f"bet_{game}_{bet}"}])
     return text, {"inline_keyboard": kb}
 
 print("Бот запущен...")
@@ -214,19 +186,15 @@ while True:
                 if data == "main_menu" or data == "menu":
                     text, kb = get_main_menu(user)
                     edit_message(chat_id, msg_id, text, kb)
-                
                 elif data == "shop":
                     text, kb = get_shop_menu(user)
                     edit_message(chat_id, msg_id, text, kb)
-                
                 elif data.startswith("buy_"):
                     parts = data.split("_")
                     send_stars_invoice(chat_id, msg_id, int(parts[2]), int(parts[1]))
-                
                 elif data == "profile":
                     text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n✅ Побед: {user['wins']}\n❌ Поражений: {user['losses']}"
                     edit_message(chat_id, msg_id, text, {"inline_keyboard": [[{"text": "⬅️ Назад", "callback_data": "main_menu"}]]})
-                
                 elif data == "bonus":
                     now = int(time.time())
                     if now - user["last_bonus"] < 86400:
@@ -237,18 +205,15 @@ while True:
                         update_user(user_id, balance=new_bal, last_bonus=now)
                         text = f"🎁 Бонус +5$!\nВаш баланс: {new_bal}$ 💵"
                     edit_message(chat_id, msg_id, text, {"inline_keyboard": [[{"text": "⬅️ Назад", "callback_data": "main_menu"}]]})
-
                 elif data.startswith("game_"):
                     game = data.split("_")[1]
                     text, kb = get_bet_menu(user, game)
                     edit_message(chat_id, msg_id, text, kb)
-
                 elif data.startswith("custom_"):
                     game = data.split("_")[1]
                     user_states[user_id] = (game, msg_id)
                     text = f"✍️ Напишите сумму вашей ставки в чат (от 10 до {user['balance']}):"
                     edit_message(chat_id, msg_id, text, {"inline_keyboard": [[{"text": "Отмена", "callback_data": f"game_{game}"}]]})
-
                 elif data.startswith("bet_"):
                     parts = data.split("_")
                     game = parts[1]
@@ -257,68 +222,71 @@ while True:
                         text = f"❌ Неверная ставка (мин. 10) или недостаточно средств!"
                         edit_message(chat_id, msg_id, text, {"inline_keyboard": [[{"text": "⬅️ Назад", "callback_data": f"game_{game}"}]]})
                     else:
-                        text, kb = get_choice_menu(user, game, bet)
+                        if game == "slots":
+                            text, kb = get_outcome_menu(user, game, bet, "3")
+                        else:
+                            text, kb = get_count_menu(user, game, bet)
                         edit_message(chat_id, msg_id, text, kb)
-
+                elif data.startswith("count_"):
+                    parts = data.split("_")
+                    game = parts[1]
+                    bet = int(parts[2])
+                    count = parts[3]
+                    text, kb = get_outcome_menu(user, game, bet, count)
+                    edit_message(chat_id, msg_id, text, kb)
                 elif data.startswith("res_"):
                     parts = data.split("_")
                     game = parts[1]
                     bet = int(parts[2])
-                    choice = parts[3]
+                    if game == "slots":
+                        choice = "_".join(parts[3:])
+                        count = 3
+                    else:
+                        count = int(parts[3])
+                        choice = "_".join(parts[4:])
+                        
                     edit_message(chat_id, msg_id, f"🎰 Крутим... Ставка: {bet}$", None)
-                    
                     win = False
                     multiplier = 1.0
                     res_detail = ""
 
-                    if game == "dice":
-                        val = random.randint(1, 6)
-                        send_animation(chat_id, "🎲"); time.sleep(2)
-                        res_detail = f"Выпало: {val}\n"
-                        if choice.isdigit() and int(choice) == val: win = True; multiplier = 5.0
-                        elif choice == "high" and val > 3: win = True; multiplier = 2.0
-                        elif choice == "low" and val < 4: win = True; multiplier = 2.0
-
-                    elif game == "slots":
-                        symbols = ["🍋", "🍒", "💎", "7️⃣"]
+                    if game == "slots":
+                        symbols = ["7️⃣", "🍋", "💎", "🍒"]
                         results = [random.choice(symbols) for _ in range(3)]
                         res_detail = f"🎰 Результат: {' '.join(results)}\n"
-                        if choice == "lose":
+                        if choice == "3_any":
                             if results[0] != results[1] or results[1] != results[2]:
-                                win = True; multiplier = 2.0
+                                win = True; multiplier = 1.6
                         else:
-                            if results[0] == results[1] == results[2]:
-                                win = True; multiplier = 16.0
-
-                    elif game == "football":
-                        val = random.randint(1, 5)
-                        send_animation(chat_id, "⚽"); time.sleep(2)
-                        res_detail = f"Матч окончен.\n"
-                        if choice == "goal" and val >= 3: win = True; multiplier = 1.5
-                        elif choice == "miss" and val < 3: win = True; multiplier = 2.5
-                    
-                    elif game == "basketball":
-                        val = random.randint(1, 10)
-                        send_animation(chat_id, "🏀"); time.sleep(2)
-                        res_detail = f"Брошено мячей: {val}\n"
-                        if choice == "2pt" and val <= 6: win = True; multiplier = 1.5
-                        elif choice == "3pt" and val > 6: win = True; multiplier = 3.0
-                    
-                    elif game == "darts":
-                        val = random.randint(1, 6)
-                        send_animation(chat_id, "🎯"); time.sleep(2)
-                        res_detail = f"Дротик брошен.\n"
-                        if choice == "bull" and val == 1: win = True; multiplier = 3.0
-                        elif choice == "miss" and val > 1: win = True; multiplier = 1.5
-                    
-                    elif game == "bowling":
-                        val = random.choices([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], weights=[15, 5, 10, 15, 15, 10, 10, 5, 5, 3, 7])[0]
-                        send_animation(chat_id, "🎳"); time.sleep(2)
-                        res_detail = f"Сбито кеглей: {val}\n"
-                        if choice == "strike" and val == 10: win = True; multiplier = 5.0
-                        elif choice == "high" and 7 <= val <= 9: win = True; multiplier = 2.5
-                        elif choice == "low" and 1 <= val <= 3: win = True; multiplier = 1.5
-                        elif choice == "miss" and val == 0: win = True; multiplier = 4.0
+                            target = choice.split("_")[1]
+                            target_sym = {"seven": "7️⃣", "lemon": "🍋", "diamond": "💎", "cherry": "🍒"}[target]
+                            if results[0] == results[1] == results[2] == target_sym:
+                                win = True; multiplier = 64.0
+                    else:
+                        rolls = []
+                        for _ in range(count):
+                            if game == "dice": rolls.append(random.randint(1, 6)); send_animation(chat_id, "🎲")
+                            elif game == "darts": rolls.append(random.choice(["miss", "bounce", "sector", "bull"])); send_animation(chat_id, "🎯")
+                            elif game == "football": rolls.append(random.choice(["miss", "post", "goal", "center", "corner"])); send_animation(chat_id, "⚽")
+                            elif game == "basketball": rolls.append(random.choice(["miss", "ring", "goal"])); send_animation(chat_id, "🏀")
+                            elif game == "bowling": rolls.append(random.choices([0, 1, 3, 5, 10], weights=[20, 30, 25, 15, 10])[0]); send_animation(chat_id, "🎳")
+                            time.sleep(1.5)
+                        res_detail = f"Результаты: {', '.join(map(str, rolls))}\n"
+                        
+                        if choice == "low" and all(r < 4 for r in rolls): win = True; multiplier = 2.0
+                        elif choice == "high" and all(r > 3 for r in rolls): win = True; multiplier = 2.0
+                        elif choice == "even" and all(r % 2 == 0 for r in rolls): win = True; multiplier = 2.0
+                        elif choice == "odd" and all(r % 2 != 0 for r in rolls): win = True; multiplier = 2.0
+                        elif choice == "exact" and all(r == random.randint(1,6) for r in rolls): win = True; multiplier = 6.0
+                        elif choice == "sector" and all(r == "sector" for r in rolls): win = True; multiplier = 3.0
+                        elif choice == "bounce" and all(r == "bounce" for r in rolls): win = True; multiplier = 6.0
+                        elif choice == "bull" and all(r == "bull" for r in rolls): win = True; multiplier = 6.0
+                        elif choice == "goal" and all(r in ["goal", "center", "corner"] for r in rolls): win = True; multiplier = 1.65
+                        elif choice == "center" and all(r == "center" for r in rolls): win = True; multiplier = 5.0
+                        elif choice == "corner" and all(r == "corner" for r in rolls): win = True; multiplier = 5.0
+                        elif choice == "post" and all(r == "post" for r in rolls): win = True; multiplier = 2.5
+                        elif choice == "strike" and all(r == 10 for r in rolls): win = True; multiplier = 5.0
+                        elif choice == "mid" and all(4 <= r <= 6 for r in rolls): win = True; multiplier = 3.0
 
                     if win:
                         win_amount = int(bet * multiplier)
@@ -348,13 +316,11 @@ while True:
                     text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n✅ Побед: {user['wins']}\n❌ Поражений: {user['losses']}"
                     send_message(chat_id, text, get_bottom_keyboard())
                     continue
-                
                 elif text_str == "🎮 Играть":
                     if user_id in user_states: del user_states[user_id]
                     text, kb = get_main_menu(user)
                     send_message(chat_id, text, kb)
                     continue
-                
                 elif text_str == "📱 Меню" or text_str == "/start" or text_str == "/help":
                     if user_id in user_states: del user_states[user_id]
                     text, kb = get_main_menu(user)
@@ -371,7 +337,10 @@ while True:
                             edit_message(chat_id, msg_id, f"❌ Недостаточно средств (Баланс: {user['balance']}$). Введите другое число:", {"inline_keyboard": [[{"text": "Отмена", "callback_data": f"game_{game}"}]]})
                         else:
                             del user_states[user_id]
-                            text, kb = get_choice_menu(user, game, bet)
+                            if game == "slots":
+                                text, kb = get_outcome_menu(user, game, bet, "3")
+                            else:
+                                text, kb = get_count_menu(user, game, bet)
                             edit_message(chat_id, msg_id, text, kb)
                     else:
                         edit_message(chat_id, msg_id, "❌ Введите число цифрами:", {"inline_keyboard": [[{"text": "Отмена", "callback_data": f"game_{game}"}]]})
