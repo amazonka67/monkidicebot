@@ -733,7 +733,7 @@ while True:
                             del user_states[user_id]
                             t, k = get_choice_menu(user, game, bet)
                             edit_message(chat_id, state_msg_id, t, k)
-                        continue
+                continue
 
     except Exception as e:
         print("Main loop error:", e)
