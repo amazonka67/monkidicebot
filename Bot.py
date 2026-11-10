@@ -12,7 +12,7 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "9193782655:AAFP7mMmjbL4ITM--2LBuStvO0Yc
 CRYPTO_TOKEN = os.environ.get("CRYPTO_TOKEN", "673588:AAeEcZ2RWDF3cGjfiB0zZZaUjlguDytrdAD")
 
 TG_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
-CRYPTO_API = "https://pay.crypt.bot/api"   # Mainnet
+CRYPTO_API = "https://pay.crypt.bot/api"
 
 DATA_FILE = "users.json"
 DEPOSIT_AMOUNTS = [10, 50, 100, 500]
@@ -493,8 +493,6 @@ def resolve_game(chat_id, game, bet, choice):
             win, multiplier = True, 4.0
 
     return win, multiplier, res_detail
-
-
 # ============================================================
 # MAIN LOOP
 # ============================================================
@@ -522,7 +520,8 @@ while True:
             # --- SUCCESSFUL PAYMENT ---
             if "message" in update and "successful_payment" in update["message"]:
                 msg = update["message"]
-                chat_id = msg["chat"]["id"]; user_id = msg["from"]["id"]
+                chat_id = msg["chat"]["id"]
+                user_id = msg["from"]["id"]
                 payload = msg["successful_payment"].get("invoice_payload", "")
                 try:
                     if payload.startswith("stars:"):
@@ -540,8 +539,10 @@ while True:
             # --- CALLBACK ---
             if "callback_query" in update:
                 cb = update["callback_query"]
-                cb_id = cb["id"]; chat_id = cb["message"]["chat"]["id"]
-                msg_id = cb["message"]["message_id"]; user_id = cb["from"]["id"]
+                cb_id = cb["id"]
+                chat_id = cb["message"]["chat"]["id"]
+                msg_id = cb["message"]["message_id"]
+                user_id = cb["from"]["id"]
                 data = cb["data"]
                 answer_callback(cb_id)
                 user = get_user(user_id)
@@ -551,16 +552,20 @@ while True:
 
                 try:
                     if data in ("main_menu", "menu"):
-                        t, k = get_main_menu(user); edit_message(chat_id, msg_id, t, k)
+                        t, k = get_main_menu(user)
+                        edit_message(chat_id, msg_id, t, k)
                     elif data == "shop":
-                        t, k = get_shop_menu(user); edit_message(chat_id, msg_id, t, k)
+                        t, k = get_shop_menu(user)
+                        edit_message(chat_id, msg_id, t, k)
                     elif data.startswith("buy_"):
                         p = data.split("_")
                         send_stars_invoice(chat_id, msg_id, int(p[2]), int(p[1]))
                     elif data == "profile":
-                        t, k = get_profile_menu(user); edit_message(chat_id, msg_id, t, k)
+                        t, k = get_profile_menu(user)
+                        edit_message(chat_id, msg_id, t, k)
                     elif data == "crypto_deposit":
-                        t, k = get_crypto_deposit_menu(); edit_message(chat_id, msg_id, t, k)
+                        t, k = get_crypto_deposit_menu()
+                        edit_message(chat_id, msg_id, t, k)
                     elif data.startswith("cryptodep_"):
                         amount = int(data.split("_")[1])
                         if amount in DEPOSIT_AMOUNTS:
@@ -588,7 +593,8 @@ while True:
                         else:
                             send_message(chat_id, "❌ Оплата не найдена. Сначала оплатите счёт.")
                     elif data == "crypto_withdraw":
-                        t, k = get_crypto_withdraw_menu(user); edit_message(chat_id, msg_id, t, k)
+                        t, k = get_crypto_withdraw_menu(user)
+                        edit_message(chat_id, msg_id, t, k)
                     elif data.startswith("cryptowd_"):
                         amount = float(data.split("_")[1])
                         if user["balance"] < amount or amount <= 0:
@@ -600,7 +606,7 @@ while True:
                                          f"Отправьте ваш <b>Telegram ID</b> получателя.\n"
                                          f"<i>ID должен быть зарегистрирован в @CryptoBot!</i>",
                                          {"inline_keyboard": [[{"text": "Отмена", "callback_data": "profile"}]]})
-                                        elif data == "bonus":
+                    elif data == "bonus":
                         now = int(time.time())
                         if user.get("last_bonus") and now - user["last_bonus"] < BONUS_COOLDOWN:
                             left = BONUS_COOLDOWN - (now - user["last_bonus"])
