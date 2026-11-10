@@ -34,6 +34,40 @@ def send_animation(chat_id, emoji):
 def answer_callback(callback_id):
     api_request("answerCallbackQuery", {"callback_query_id": callback_id})
 
+# --- ОПЛАТА ЗВЕЗДАМИ (STARS) ---
+def send_stars_invoice(chat_id, amount_stars, amount_dollars):
+    # Создаем ссылку на счет
+    url = f"https://api.telegram.org/bot{TOKEN}/createInvoiceLink"
+    payload = {
+        "title": f"Покупка {amount_dollars}$",
+        "description": f"Пополнение баланса на {amount_dollars} долларов",
+        "payload": f"buy_{amount_dollars}_{amount_stars}", # Данные для проверки
+        "currency": "XTR", # Код валюты Telegram Stars
+        "prices": [{"label": f"{amount_dollars}$", "amount": amount_stars}]
+    }
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    
+    try:
+        response = urllib.request.urlopen(req, timeout=10)
+        result = json.loads(response.read().decode("utf-8"))
+        if result.get("ok"):
+            invoice_link = result["result"]
+            # Отправляем пользователю кнопку для оплаты
+            kb = {
+                "inline_keyboard": [
+                    [{"text": f"💎 Оплатить {amount_stars} Stars", "url": invoice_link}],
+                    [{"text": "⬅️ Назад", "callback_data": "menu"}]
+                ]
+            }
+            edit_message(chat_id, user_states.get(chat_id, [None])[0], "👇 Нажмите на кнопку ниже, чтобы оплатить:", kb)
+        else:
+            print("Ошибка создания счета:", result)
+            send_message(chat_id, "❌ Ошибка при создании счета. Попробуйте позже.")
+    except Exception as e:
+        print("Ошибка API createInvoiceLink:", e)
+        send_message(chat_id, "❌ Ошибка при создании счета. Попробуйте позже.")
+
 def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r", encoding="utf-8") as f:
@@ -74,7 +108,26 @@ def get_main_menu(user):
             [{"text": "🎲 Дайс", "callback_data": "game_dice"}, {"text": "🎯 Дартс", "callback_data": "game_darts"}],
             [{"text": "⚽ Футбол", "callback_data": "game_football"}, {"text": "🏀 Баскет", "callback_data": "game_basketball"}],
             [{"text": "🎳 Боулинг", "callback_data": "game_bowling"}, {"text": "🎰 Слоты", "callback_data": "game_slots"}],
-            [{"text": "💰 Баланс", "callback_data": "profile"}, {"text": "🎁 Бонус", "callback_data": "bonus"}]
+            [{"text": "💰 Баланс", "callback_data": "profile"}, {"text": "🎁 Бонус", "callback_data": "bonus"}],
+            [{"text": "💎 Купить $", "callback_data": "shop"}] # Новая кнопка магазина
+        ]
+    }
+    return text, kb
+
+def get_shop_menu(user):
+    text = (
+        f"💎 <b>Магазин валюты</b>\n\n"
+        f"Здесь вы можете пополнить свой баланс долларов за Telegram Stars.\n"
+        f"Ваш текущий баланс: <b>{user['balance']}$</b> 💵\n\n"
+        f"Выберите пакет:"
+    )
+    kb = {
+        "inline_keyboard": [
+            [{"text": "100$ за 10 ⭐", "callback_data": "buy_100_10"}],
+            [{"text": "500$ за 40 ⭐", "callback_data": "buy_500_40"}],
+            [{"text": "1000$ за 70 ⭐", "callback_data": "buy_1000_70"}],
+            [{"text": "5000$ за 300 ⭐", "callback_data": "buy_5000_300"}],
+            [{"text": "⬅️ Назад", "callback_data": "menu"}]
         ]
     }
     return text, kb
@@ -143,6 +196,30 @@ while True:
         for update in updates["result"]:
             offset = update["update_id"] + 1
 
+            # --- ОБРАБОТКА УСПЕШНОЙ ОПЛАТЫ ---
+            if "pre_checkout_query" in update:
+                pcq = update["pre_checkout_query"]
+                # Подтверждаем готовность к оплате
+                api_request("answerPreCheckoutQuery", {"pre_checkout_query_id": pcq["id"], "ok": True})
+                continue
+
+            if "message" in update and "successful_payment" in update["message"]:
+                msg = update["message"]
+                chat_id = msg["chat"]["id"]
+                user_id = msg["from"]["id"]
+                payload = msg["successful_payment"]["invoice_payload"]
+                
+                # payload выглядит как "buy_1000_70" (1000 долларов за 70 звезд)
+                parts = payload.split("_")
+                if len(parts) == 3:
+                    dollars = int(parts[1])
+                    user = get_user(user_id)
+                    new_bal = user["balance"] + dollars
+                    update_user(user_id, balance=new_bal)
+                    send_message(chat_id, f"✅ Оплата прошла успешно!\nВам начислено <b>{dollars}$</b> 💵\nВаш баланс: {new_bal}$")
+                continue
+
+            # --- КНОПКИ ---
             if "callback_query" in update:
                 cb = update["callback_query"]
                 cb_id = cb["id"]
@@ -154,12 +231,24 @@ while True:
                 answer_callback(cb_id)
                 user = get_user(user_id)
 
-                if user_id in user_states:
-                    del user_states[user_id]
+                if chat_id not in user_states:
+                    user_states[chat_id] = [msg_id]
+                else:
+                    user_states[chat_id] = [msg_id]
 
                 if data == "menu":
                     text, kb = get_main_menu(user)
                     edit_message(chat_id, msg_id, text, kb)
+                
+                elif data == "shop":
+                    text, kb = get_shop_menu(user)
+                    edit_message(chat_id, msg_id, text, kb)
+                
+                elif data.startswith("buy_"):
+                    parts = data.split("_")
+                    dollars = int(parts[1])
+                    stars = int(parts[2])
+                    send_stars_invoice(chat_id, stars, dollars)
                 
                 elif data == "profile" or data == "balance":
                     text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n✅ Побед: {user['wins']}\n❌ Поражений: {user['losses']}"
@@ -211,6 +300,7 @@ while True:
                     win = False
                     multiplier = 1.0
                     
+                    # ... ЛОГИКА ИГР (без изменений) ...
                     if game == "dice":
                         val = random.randint(1, 6)
                         if choice == "high" and val > 3: win = True
@@ -218,6 +308,7 @@ while True:
                         send_animation(chat_id, "🎲")
                         time.sleep(2.5)
                         multiplier = 2.0
+                    # ... и так далее для других игр ...
                     elif game == "football":
                         val = random.randint(1, 5)
                         if choice == "goal" and val >= 3: win = True
@@ -272,6 +363,7 @@ while True:
                     text, kb = get_main_menu(get_user(user_id))
                     send_message(chat_id, res_text + text, kb)
 
+            # --- ТЕКСТОВЫЕ КОМАНДЫ ---
             elif "message" in update and "text" in update["message"]:
                 msg = update["message"]
                 chat_id = msg["chat"]["id"]
