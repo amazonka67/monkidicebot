@@ -7,6 +7,9 @@ import os
 TOKEN = os.environ.get("BOT_TOKEN", "9193782655:AAFP7mMmjbL4ITM--2LBuStvO0YcTTc9gOk")
 DATA_FILE = "users.json"
 
+# Ссылка на GIF для рулетки (замените на любую свою)
+ROULETTE_GIF_URL = "https://media.giphy.com/media/3o7TKSjRrfIPjeiVyM/giphy.gif"
+
 def api_request(method, payload):
     url = f"https://api.telegram.org/bot{TOKEN}/{method}"
     data = json.dumps(payload).encode("utf-8")
@@ -28,8 +31,12 @@ def edit_message(chat_id, message_id, text, reply_markup=None):
         payload["reply_markup"] = reply_markup
     api_request("editMessageText", payload)
 
-def send_animation(chat_id, emoji):
-    api_request("sendDice", {"chat_id": chat_id, "emoji": emoji})
+# Отправка GIF (Анимации)
+def send_animation(chat_id, animation_url_or_id, caption=None):
+    payload = {"chat_id": chat_id, "animation": animation_url_or_id}
+    if caption:
+        payload["caption"] = caption
+    api_request("sendAnimation", payload)
 
 def answer_callback(callback_id):
     api_request("answerCallbackQuery", {"callback_query_id": callback_id})
@@ -60,7 +67,7 @@ def update_user(uid, **kwargs):
     data[uid].update(kwargs)
     save_data(data)
 
-# --- ИНТЕРФЕЙС (Клавиатуры) ---
+# --- ИНТЕРФЕЙС ---
 
 def get_main_menu(user):
     text = (
@@ -124,7 +131,7 @@ def get_choice_menu(user, game, bet):
             [{"text": "⚪ 1-3 (x1.5)", "callback_data": f"res_{game}_{bet}_low"}, {"text": "❌ Промах (x4)", "callback_data": f"res_{game}_{bet}_miss"}]
         ]
     elif game == "roulette":
-        kb = [[{"text": "🔴 Красное (x2)", "callback_data": f"res_{game}_{bet}_red"}], [{"text": "⚫ Черное (x2)", "callback_data": f"res_{game}_{bet}_black"}]]
+        kb = [[{"text": "🔴 Красное (x2)", "callback_data": f"res_{game}_{bet}_red"}], [{"text": "⚫ Черное (x2)", "callback_data": f"res_{game}_{bet}_black"}], [{"text": "🟢 Зеро (x5)", "callback_data": f"res_{game}_{bet}_zero"}]]
     elif game == "mines":
         kb = [[{"text": "💣 Наступить на мину (x3)", "callback_data": f"res_{game}_{bet}_bomb"}], [{"text": "💎 Найти алмаз (x1.5)", "callback_data": f"res_{game}_{bet}_gem"}]]
     
@@ -133,7 +140,7 @@ def get_choice_menu(user, game, bet):
 
 print("Бот запущен...")
 offset = 0
-user_states = {} # Храним, кто сейчас вводит свою ставку
+user_states = {}
 
 while True:
     try:
@@ -211,65 +218,89 @@ while True:
                     bet = int(parts[2])
                     choice = parts[3]
                     
-                    # Убираем кнопки перед анимацией, чтобы нельзя было нажать дважды
+                    # Убираем кнопки перед анимацией
                     edit_message(chat_id, msg_id, f"🎰 Крутим... Ставка: {bet}", None)
-                    
-                    emoji = {"dice": "🎲", "darts": "🎯", "football": "⚽", "basketball": "🏀", "slots": "🎰", "bowling": "🎳", "roulette": "🎲", "mines": "🎲"}[game]
-                    send_animation(chat_id, emoji)
-                    time.sleep(2.5)
                     
                     win = False
                     multiplier = 1.0
+                    win_reason = ""
 
                     if game == "dice":
                         val = random.randint(1, 6)
-                        if choice == "high" and val > 3: win = True
-                        elif choice == "low" and val < 4: win = True
+                        if choice == "high" and val > 3: win = True; win_reason = f"Выпало {val} (Больше 3)"
+                        elif choice == "low" and val < 4: win = True; win_reason = f"Выпало {val} (Меньше 4)"
+                        send_animation(chat_id, "🎲")
+                        time.sleep(2.5)
                         multiplier = 2.0
                         
                     elif game == "football":
                         val = random.randint(1, 5)
-                        if choice == "goal" and val >= 3: win = True
-                        elif choice == "miss" and val < 3: win = True
+                        if choice == "goal" and val >= 3: win = True; win_reason = "ГОЛ!"
+                        elif choice == "miss" and val < 3: win = True; win_reason = "Мимо ворот!"
+                        send_animation(chat_id, "⚽")
+                        time.sleep(2.5)
                         multiplier = 1.5 if choice == "goal" else 2.5
 
                     elif game == "basketball":
                         val = random.randint(1, 5)
-                        if choice == "goal" and val >= 3: win = True
-                        elif choice == "miss" and val < 3: win = True
+                        if choice == "goal" and val >= 3: win = True; win_reason = "Точный бросок!"
+                        elif choice == "miss" and val < 3: win = True; win_reason = "Промах!"
+                        send_animation(chat_id, "🏀")
+                        time.sleep(2.5)
                         multiplier = 2.5 if choice == "goal" else 1.5
                         
                     elif game == "darts":
                         val = random.randint(1, 6)
-                        if choice == "bull" and val == 1: win = True
-                        elif choice == "miss" and val > 1: win = True
+                        if choice == "bull" and val == 1: win = True; win_reason = "В яблочко!"
+                        elif choice == "miss" and val > 1: win = True; win_reason = "Мимо мишени!"
+                        send_animation(chat_id, "🎯")
+                        time.sleep(2.5)
                         multiplier = 3.0 if choice == "bull" else 1.5
 
                     elif game == "slots":
                         val = random.randint(1, 64)
-                        if choice == "win" and val == 1: win = True
-                        elif choice == "lose" and val > 1: win = True
+                        if choice == "win" and val == 1: win = True; win_reason = "Джекпот!"
+                        elif choice == "lose" and val > 1: win = True; win_reason = "Не зашло"
+                        send_animation(chat_id, "🎰")
+                        time.sleep(2.5)
                         multiplier = 5.0 if choice == "win" else 1.2
                     
                     elif game == "bowling":
                         val = random.choices([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], weights=[15, 5, 10, 15, 15, 10, 10, 5, 5, 3, 7])[0]
-                        if choice == "strike" and val == 10: win = True
-                        elif choice == "high" and 7 <= val <= 9: win = True
-                        elif choice == "low" and 1 <= val <= 3: win = True
-                        elif choice == "miss" and val == 0: win = True
+                        if choice == "strike" and val == 10: win = True; win_reason = "Страйк!"
+                        elif choice == "high" and 7 <= val <= 9: win = True; win_reason = f"Сбито {val} кеглей"
+                        elif choice == "low" and 1 <= val <= 3: win = True; win_reason = f"Сбито {val} кегли"
+                        elif choice == "miss" and val == 0: win = True; win_reason = "Промах!"
+                        send_animation(chat_id, "🎳")
+                        time.sleep(2.5)
                         if choice == "strike": multiplier = 5.0
                         elif choice == "high": multiplier = 2.5
                         elif choice == "low": multiplier = 1.5
                         elif choice == "miss": multiplier = 4.0
                         
                     elif game == "roulette":
-                        val = random.choice(["red", "black"])
-                        if choice == val: win = True
-                        multiplier = 2.0
+                        # 10 секторов: 4 красных, 4 черных, 2 зеро
+                        sectors = ["red"] * 4 + ["black"] * 4 + ["zero"] * 2
+                        random.shuffle(sectors)
+                        # Выбираем случайный индекс (0-9)
+                        result_idx = random.randint(0, 9)
+                        result_sector = sectors[result_idx]
+                        
+                        # Отправляем GIF отдельным сообщением
+                        send_animation(chat_id, ROULETTE_GIF_URL)
+                        time.sleep(3) # Ждем, пока проиграется GIF
+                        
+                        if choice == result_sector:
+                            win = True
+                            win_reason = f"Выпало: {result_sector.upper()}"
+                        
+                        multiplier = 5.0 if choice == "zero" else 2.0
                         
                     elif game == "mines":
                         val = random.choice(["bomb", "gem"])
-                        if choice == val: win = True
+                        if choice == val: win = True; win_reason = "Угадали!"
+                        send_animation(chat_id, "🎲")
+                        time.sleep(2.5)
                         multiplier = 3.0 if choice == "bomb" else 1.5
 
                     # Итог
@@ -277,16 +308,16 @@ while True:
                         win_amount = int(bet * multiplier)
                         new_bal = user["balance"] + win_amount - bet
                         update_user(user_id, balance=new_bal, wins=user["wins"] + 1)
-                        res_text = f"🎉 <b>Победа!</b>\nВы получили: <b>+{win_amount}</b> 🪙\n(Чистая прибыль: +{win_amount - bet})\n\n"
+                        res_text = f"🎉 <b>Победа!</b>\n{win_reason}\nВы получили: <b>+{win_amount}</b> 🪙\n(Чистая прибыль: +{win_amount - bet})\n\n"
                     else:
                         new_bal = user["balance"] - bet
                         update_user(user_id, balance=new_bal, losses=user["losses"] + 1)
-                        res_text = f"😢 <b>Проигрыш.</b>\nПотеряно: <b>-{bet}</b> 🪙\n\n"
+                        res_text = f"😢 <b>Проигрыш.</b>\n{win_reason}\nПотеряно: <b>-{bet}</b> 🪙\n\n"
                     
-                    # Обновляем сообщение с результатом и кнопкой возврата
+                    # Отправляем отдельное сообщение с результатом
                     text, kb = get_main_menu(get_user(user_id))
                     final_text = res_text + text
-                    edit_message(chat_id, msg_id, final_text, kb)
+                    send_message(chat_id, final_text, kb)
 
             elif "message" in update and "text" in update["message"]:
                 msg = update["message"]
