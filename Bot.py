@@ -352,7 +352,7 @@ text, kb = get_shop_menu(user)
 edit_message(chat_id, msg_id, text, kb)
 elif data.startswith("buy_"):
 parts = data.split("_")
-send_stars_invoice(chat_id, msg_id, int(parts), int(parts[1]))
+send_stars_invoice(chat_id, msg_id, int(parts[2]), int(parts[1]))
 # КРИПТО ИНТЕРФЕЙСЫ
 elif data == "profile":
 text, kb = get_profile_menu(user)
@@ -364,7 +364,7 @@ elif data.startswith("cryptodep_"):
 amount = int(data.split("_")[1])
 create_crypto_invoice(chat_id, msg_id, amount)
 elif data.startswith("check_dep_"):
-invoice_id = data.split("_")
+invoice_id = data.split("_")[2]
 res = crypto_api_request("getInvoices", {"invoice_ids": [int(invoice_id)]})
 is_paid = False
 dep_amount = 0.0
@@ -413,7 +413,7 @@ edit_message(chat_id, msg_id, text, {"inline_keyboard": [[{"text": "Отмена
 elif data.startswith("bet_"):
 parts = data.split("")
 game = parts[1]
-bet = int(parts)
+bet = int(parts[2])
 if bet > user["balance"] or bet < 10:
 text = f"❌ Неверная ставка (мин. 10) или недостаточно средств!"
 edit_message(chat_id, msg_id, text, {"inline_keyboard": [[{"text": "⬅️ Назад", "callback_data": f"game{game}"}]]})
@@ -423,8 +423,8 @@ edit_message(chat_id, msg_id, text, kb)
 elif data.startswith("res_"):
 parts = data.split("_")
 game = parts[1]
-bet = int(parts)
-choice = parts
+bet = int(parts[2])
+choice = parts[3]
 edit_message(chat_id, msg_id, f"🎰 Инициализация раунда... Ставка: {bet}$", None)
 win = False
 multiplier = 1.0
@@ -434,11 +434,11 @@ symbols = ["🍋", "🍒", "💎", "7️⃣"]
 results = [random.choice(symbols) for _ in range(3)]
 res_detail = f"🎰 Результат: {' '.join(results)}\n"
 if choice == "lose":
-if results[0] != results[1] or results[1] != results:
+if results[0] != results[1] or results[1] != results[2]:
 win = True; multiplier = 2.0
 else:
 target_sym = {"lemon": "🍋", "cherry": "🍒", "diamond": "💎", "seven": "7️⃣"}[choice]
-if results[0] == results[1] == results == target_sym:
+if results[0] == results[1] == results[2] == target_sym:
 win = True; multiplier = 16.0
 elif game == "dice" or game == "turbo":
 if choice == "three_high" or choice == "three_six":
