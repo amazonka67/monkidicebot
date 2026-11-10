@@ -81,6 +81,16 @@ def update_user(uid, **kwargs):
     data[uid].update(kwargs)
     save_data(data)
 
+# --- КЛАВИАТУРА СНИЗУ ---
+def get_bottom_keyboard():
+    return {
+        "keyboard": [
+            [{"text": "💰 Баланс"}, {"text": "🎮 Играть"}, {"text": "📱 Меню"}]
+        ],
+        "resize_keyboard": True,
+        "is_persistent": True
+    }
+
 # --- МЕНЮ ---
 
 def get_main_menu(user):
@@ -88,7 +98,7 @@ def get_main_menu(user):
         f"👤 <b>{user['name']}</b>\n"
         f"💰 Баланс: <b>{user['balance']}$</b> 💵\n"
         f"📈 Статистика: ✅ {user['wins']} | ❌ {user['losses']}\n\n"
-        f"🎰 <b>Выберите игру или режим:</b>"
+        f"🎰 <b>Выберите игру:</b>"
     )
     kb = {
         "inline_keyboard": [
@@ -133,7 +143,6 @@ def get_choice_menu(user, game, bet):
     kb = []
     
     if game == "darts":
-        text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n💵 Ставка: <b>{bet}$</b>\n\n🎯 <b>Куда попадет дротик? (Секторы):</b>"
         kb = [
             [{"text": "🔴 Красное (x2)", "callback_data": f"res_{game}_{bet}_red"}],
             [{"text": "⚪ Белое (x2)", "callback_data": f"res_{game}_{bet}_white"}],
@@ -141,7 +150,6 @@ def get_choice_menu(user, game, bet):
             [{"text": "❌ Промах (x3)", "callback_data": f"res_{game}_{bet}_miss"}]
         ]
     elif game == "bowling":
-        text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n💵 Ставка: <b>{bet}$</b>\n\n🎳 <b>Сколько кеглей собьешь?</b>"
         kb = [
             [{"text": "🎳 Страйк (10) x5", "callback_data": f"res_{game}_{bet}_strike"}],
             [{"text": "🎯 7-9 кеглей (x2.5)", "callback_data": f"res_{game}_{bet}_high"}],
@@ -149,21 +157,18 @@ def get_choice_menu(user, game, bet):
             [{"text": "❌ Промах (0) x4", "callback_data": f"res_{game}_{bet}_miss"}]
         ]
     elif game == "football":
-        text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n💵 Ставка: <b>{bet}$</b>\n\n⚽ <b>Исход матча:</b>"
         kb = [
             [{"text": "⚽ Гол (x1.5)", "callback_data": f"res_{game}_{bet}_goal"}],
             [{"text": "❌ Мимо (x2.5)", "callback_data": f"res_{game}_{bet}_miss"}],
             [{"text": "🔥 Обе забьют (x3)", "callback_data": f"res_{game}_{bet}_both"}]
         ]
     elif game == "basketball":
-        text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n💵 Ставка: <b>{bet}$</b>\n\n🏀 <b>Сколько очков наберет игрок?</b>"
         kb = [
             [{"text": "2 очка (x1.5)", "callback_data": f"res_{game}_{bet}_2pt"}],
             [{"text": "3 очка (x3)", "callback_data": f"res_{game}_{bet}_3pt"}],
             [{"text": "Промах (x2)", "callback_data": f"res_{game}_{bet}_miss"}]
         ]
     elif game == "dice":
-        text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n💵 Ставка: <b>{bet}$</b>\n\n🎲 <b>Выберите режим (1 или 2 броска):</b>"
         kb = [
             [{"text": "1 бросок: Больше 3 (x2)", "callback_data": f"res_{game}_{bet}_1_high"}, {"text": "1 бросок: Меньше 4 (x2)", "callback_data": f"res_{game}_{bet}_1_low"}],
             [{"text": "2 броска: Сумма > 7 (x2)", "callback_data": f"res_{game}_{bet}_2_high"}, {"text": "2 броска: Сумма < 7 (x2)", "callback_data": f"res_{game}_{bet}_2_low"}],
@@ -187,7 +192,6 @@ def get_choice_menu(user, game, bet):
             [{"text": "🪙 Решка (x2)", "callback_data": f"res_{game}_{bet}_tails"}]
         ]
     elif game == "slots":
-        text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n💵 Ставка: <b>{bet}$</b>\n\n🎰 <b>Выберите символ (3 в ряд = x16):</b>"
         kb = [
             [{"text": "🍋 Лимон (x16)", "callback_data": f"res_{game}_{bet}_lemon"}],
             [{"text": "🍒 Вишня (x16)", "callback_data": f"res_{game}_{bet}_cherry"}],
@@ -243,7 +247,8 @@ while True:
                 answer_callback(cb_id)
                 user = get_user(user_id)
 
-                if user_id in user_states and not data.startswith("res_"):
+                # Если нажали Inline-кнопку, сбрасываем режим ввода ставки
+                if user_id in user_states:
                     del user_states[user_id]
 
                 if data == "main_menu" or data == "menu":
@@ -307,7 +312,6 @@ while True:
                     res_detail = ""
 
                     if game == "darts":
-                        # Сектора: 2 красных, 2 белых, 2 промаха, 2 центра (всего 8)
                         sectors = ["red", "red", "white", "white", "miss", "miss", "bull", "bull"]
                         result_sector = random.choice(sectors)
                         send_animation(chat_id, "🎯"); time.sleep(2)
@@ -384,7 +388,7 @@ while True:
                             if choice == "turbo_high" and d1 > 3 and d2 > 3 and d3 > 3: win = True
                             elif choice == "turbo_low" and d1 < 4 and d2 < 4 and d3 < 4: win = True
                             multiplier = 5.0
-                        else: # three_high или three_six
+                        else:
                             d1 = random.randint(1, 6); send_animation(chat_id, "🎲"); time.sleep(1)
                             d2 = random.randint(1, 6); send_animation(chat_id, "🎲"); time.sleep(1)
                             d3 = random.randint(1, 6); send_animation(chat_id, "🎲"); time.sleep(1.5)
@@ -430,6 +434,26 @@ while True:
                 user = get_user(user_id)
                 update_user(user_id, name=first_name)
 
+                # ИСПРАВЛЕНИЕ: Проверяем нижние кнопки ДО того, как проверять ввод ставки
+                if text_str == "💰 Баланс":
+                    if user_id in user_states: del user_states[user_id] # Сбрасываем ввод
+                    text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n✅ Побед: {user['wins']}\n❌ Поражений: {user['losses']}"
+                    send_message(chat_id, text, get_bottom_keyboard())
+                    continue
+                
+                elif text_str == "🎮 Играть":
+                    if user_id in user_states: del user_states[user_id]
+                    text, kb = get_main_menu(user)
+                    send_message(chat_id, text, kb)
+                    continue
+                
+                elif text_str == "📱 Меню" or text_str == "/start" or text_str == "/help":
+                    if user_id in user_states: del user_states[user_id]
+                    text, kb = get_main_menu(user)
+                    send_message(chat_id, text, get_bottom_keyboard())
+                    continue
+
+                # Обработка ввода своей ставки
                 if user_id in user_states:
                     game, msg_id = user_states[user_id]
                     if text_str.isdigit():
