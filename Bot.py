@@ -673,15 +673,15 @@ while True:
                             update_user(user_id, balance=new_bal, losses=user["losses"] + 1)
                             res_text = f"😢 <b>Проигрыш.</b>\n{res_detail}Потеряно: <b>-{bet}$</b>\n\n"
 
-                                                text, kb = get_main_menu(get_user(user_id))
+                        text, kb = get_main_menu(get_user(user_id))
                         send_message(chat_id, res_text + text, kb)
 
                 except Exception as e:
-                     print("Callback error:", e)                   
+                    print("Callback error:", e)
                 continue
 
             # --- TEXT MESSAGE ---
-              if "message" in update and "text" in update["message"]:                
+            if "message" in update and "text" in update["message"]:
                 msg = update["message"]
                 chat_id = msg["chat"]["id"]
                 text_str = msg["text"].strip()
@@ -715,7 +715,7 @@ while True:
 
                     elif isinstance(state_info, tuple):
                         game, state_msg_id = state_info
-                        try:
+                try:
                             bet = float(text_str)
                         except ValueError:
                             edit_message(chat_id, state_msg_id, "❌ Введите число цифрами:",
