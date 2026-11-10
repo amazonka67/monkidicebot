@@ -19,7 +19,7 @@ def send_message(chat_id, text, reply_markup=None):
     except Exception as e:
         print("Ошибка отправки:", e)
 
-# Функция отправки ЛЮБОЙ анимации (кубик, дартс, футбол, слоты)
+# Функция отправки ЛЮБОЙ анимации (кубик, дартс, футбол, слоты, боулинг)
 def send_animation(chat_id, emoji):
     url = f"https://api.telegram.org/bot{TOKEN}/sendDice"
     payload = {"chat_id": chat_id, "emoji": emoji}
@@ -71,6 +71,7 @@ def get_main_keyboard():
         "inline_keyboard": [
             [{"text": "🎲 Дайс", "callback_data": "play_dice"}, {"text": "🎯 Дартс", "callback_data": "play_darts"}],
             [{"text": "⚽ Футбол", "callback_data": "play_football"}, {"text": "🎰 Слоты", "callback_data": "play_slots"}],
+            [{"text": "🎳 Боулинг", "callback_data": "play_bowling"}],
             [{"text": "💰 Баланс", "callback_data": "balance"}, {"text": "🎁 Бонус", "callback_data": "bonus"}]
         ]
     }
@@ -115,6 +116,16 @@ def get_choice_keyboard(game, bet):
                 [{"text": "💎 3 в ряд (x5)", "callback_data": f"res_{game}_{bet}_win"}],
                 [{"text": "❌ Не зашло (x1.2)", "callback_data": f"res_{game}_{bet}_lose"}],
                 [{"text": "⬅️ Назад", "callback_data": "play_slots"}]
+            ]
+        }
+    elif game == "bowling":
+        return {
+            "inline_keyboard": [
+                [{"text": "🎳 Страйк 10/10 (x5)", "callback_data": f"res_{game}_{bet}_strike"}],
+                [{"text": "🎯 Сбито 7-9 (x2.5)", "callback_data": f"res_{game}_{bet}_high"}],
+                [{"text": "⚪ Сбито 1-3 (x1.5)", "callback_data": f"res_{game}_{bet}_low"}],
+                [{"text": "❌ Промах 0 (x4)", "callback_data": f"res_{game}_{bet}_miss"}],
+                [{"text": "⬅️ Назад", "callback_data": "play_bowling"}]
             ]
         }
 
@@ -180,13 +191,13 @@ while True:
                     bet = int(parts[2])
                     choice = parts[3]
                     
-                    # Отправляем анимацию
-                    emoji = {"dice": "🎲", "darts": "🎯", "football": "⚽", "slots": "🎰"}[game]
+                    emoji = {"dice": "🎲", "darts": "🎯", "football": "⚽", "slots": "🎰", "bowling": "🎳"}[game]
                     send_animation(chat_id, emoji)
                     time.sleep(2.5)
                     
                     win = False
                     profit = 0
+                    val = 0
 
                     if game == "dice":
                         val = random.randint(1, 6)
@@ -195,22 +206,35 @@ while True:
                         profit = int(bet * 2)
                         
                     elif game == "football":
-                        val = random.randint(1, 5) # 1-2 мимо, 3-5 гол
+                        val = random.randint(1, 5)
                         if choice == "goal" and val >= 3: win = True
                         elif choice == "miss" and val < 3: win = True
                         profit = int(bet * (1.5 if choice == "goal" else 2.5))
                         
                     elif game == "darts":
-                        val = random.randint(1, 6) # 1 яблочко, 2-6 мимо
+                        val = random.randint(1, 6)
                         if choice == "bull" and val == 1: win = True
                         elif choice == "miss" and val > 1: win = True
                         profit = int(bet * (3 if choice == "bull" else 1.5))
 
                     elif game == "slots":
-                        val = random.randint(1, 64) # 1 выигрыш, 2-64 проигрыш
+                        val = random.randint(1, 64)
                         if choice == "win" and val == 1: win = True
                         elif choice == "lose" and val > 1: win = True
                         profit = int(bet * (5 if choice == "win" else 1.2))
+                    
+                    elif game == "bowling":
+                        # Симуляция сбитых кеглей: шанс на промах 15%, страйк 15%, остальное распределено
+                        val = random.choices([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], weights=[15, 5, 10, 15, 15, 10, 10, 5, 5, 3, 7])[0]
+                        if choice == "strike" and val == 10: win = True
+                        elif choice == "high" and 7 <= val <= 9: win = True
+                        elif choice == "low" and 1 <= val <= 3: win = True
+                        elif choice == "miss" and val == 0: win = True
+                        
+                        if choice == "strike": profit = int(bet * 5)
+                        elif choice == "high": profit = int(bet * 2.5)
+                        elif choice == "low": profit = int(bet * 1.5)
+                        elif choice == "miss": profit = int(bet * 4)
                     
                     if win:
                         new_bal = user["balance"] + profit - bet
