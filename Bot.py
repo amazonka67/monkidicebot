@@ -721,15 +721,15 @@ while True:
                             edit_message(chat_id, state_msg_id, "❌ Введите число цифрами:",
                                          {"inline_keyboard": [[{"text": "Отмена", "callback_data": f"game_{game}"}]]})
                             continue
-                        if bet < MIN_BET:
+                if bet < MIN_BET:
                             edit_message(chat_id, state_msg_id,
                                          f"❌ Мин. ставка {MIN_BET}$. Введите другое число:",
                                          {"inline_keyboard": [[{"text": "Отмена", "callback_data": f"game_{game}"}]]})
-                        elif bet > user["balance"]:
+                elif bet > user["balance"]:
                             edit_message(chat_id, state_msg_id,
                                          f"❌ Недостаточно средств (Баланс: {user['balance']}$). Введите другое число:",
                                          {"inline_keyboard": [[{"text": "Отмена", "callback_data": f"game_{game}"}]]})
-                        else:
+                else:
                             del user_states[user_id]
                             t, k = get_choice_menu(user, game, bet)
                             edit_message(chat_id, state_msg_id, t, k)
