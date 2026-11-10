@@ -717,7 +717,7 @@ while True:
                         game, state_msg_id = state_info
                 try:
                             bet = float(text_str)
-                        except ValueError:
+                except ValueError:
                             edit_message(chat_id, state_msg_id, "❌ Введите число цифрами:",
                                          {"inline_keyboard": [[{"text": "Отмена", "callback_data": f"game_{game}"}]]})
                             continue
