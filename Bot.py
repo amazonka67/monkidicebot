@@ -498,7 +498,7 @@ if choice == "bull" and val == 1: win = True
 elif choice == "miss" and val > 1: win = True
 multiplier = 3.0 if choice == "bull" else 1.5
 elif game == "bowling":
-val = random.choices([0, 1, 4, 5, 6, 7, 8, 9, 10], weights=[15, 5, 10, 15, 15, 10, 10, 5, 5, 7])[0]
+val = random.choices([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], weights=[15, 5, 10, 15, 15, 10, 10, 5, 5, 3, 7])[0]
 send_animation(chat_id, "🎳"); time.sleep(2)
 res_detail = f"Сбито кеглей: {val}\n"
 if choice == "strike" and val == 10: win = True
