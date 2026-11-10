@@ -600,6 +600,134 @@ while True:
                                          f"Отправьте ваш <b>Telegram ID</b> получателя.\n"
                                          f"<i>ID должен быть зарегистрирован в @CryptoBot!</i>",
                                          {"inline_keyboard": [[{"text": "Отмена", "callback_data": "profile"}]]})
-                    elif data == "bonus":
+                                        elif data == "bonus":
                         now = int(time.time())
-                        if user.get("last_bonus") and now - user["last_bonus
+                        if user.get("last_bonus") and now - user["last_bonus"] < BONUS_COOLDOWN:
+                            left = BONUS_COOLDOWN - (now - user["last_bonus"])
+                            text = f"⏳ Бонус уже получен.\nЖдать: {left//3600}ч {(left%3600)//60}м"
+                            edit_message(chat_id, msg_id, text,
+                                         {"inline_keyboard": [[{"text": "⬅️ Назад", "callback_data": "main_menu"}]]})
+                        else:
+                            new_bal = round(user["balance"] + BONUS_AMOUNT, 2)
+                            update_user(user_id, balance=new_bal, last_bonus=now)
+                            text = f"🎁 Бонус +{BONUS_AMOUNT}$!\nВаш баланс: {new_bal}$ 💵"
+                            edit_message(chat_id, msg_id, text,
+                                         {"inline_keyboard": [[{"text": "⬅️ Назад", "callback_data": "main_menu"}]]})
+                    elif data.startswith("game_"):
+                        game = data.split("_", 1)[1]
+                        t, k = get_bet_menu(user, game)
+                        edit_message(chat_id, msg_id, t, k)
+                    elif data.startswith("custom_"):
+                        game = data.split("_", 1)[1]
+                        user_states[user_id] = (game, msg_id)
+                        edit_message(chat_id, msg_id,
+                                     f"✍️ Напишите сумму ставки в чат (от {MIN_BET} до {user['balance']}):",
+                                     {"inline_keyboard": [[{"text": "Отмена", "callback_data": f"game_{game}"}]]})
+                    elif data.startswith("bet_"):
+                        parts = data.split("_")
+                        game = parts[1]
+                        try:
+                            bet = float(parts[2])
+                        except ValueError:
+                            bet = 0
+                        if bet > user["balance"] or bet < MIN_BET:
+                            edit_message(chat_id, msg_id,
+                                         f"❌ Неверная ставка (мин. {MIN_BET}) или недостаточно средств!",
+                                         {"inline_keyboard": [[{"text": "⬅️ Назад", "callback_data": f"game_{game}"}]]})
+                        else:
+                            t, k = get_choice_menu(user, game, bet)
+                            edit_message(chat_id, msg_id, t, k)
+                    elif data.startswith("res_"):
+                        parts = data.split("_")
+                        game = parts[1]
+                        try:
+                            bet = float(parts[2])
+                        except ValueError:
+                            bet = 0
+                        choice = parts[3]
+                        if bet > user["balance"] or bet < MIN_BET:
+                            edit_message(chat_id, msg_id, "❌ Ставка недействительна.",
+                                         {"inline_keyboard": [[{"text": "⬅️ Назад", "callback_data": "main_menu"}]]})
+                            continue
+
+                        edit_message(chat_id, msg_id, f"🎰 Крутим... Ставка: {bet}$", None)
+                        win, multiplier, res_detail = resolve_game(chat_id, game, bet, choice)
+
+                        if win:
+                            win_amount = round(bet * multiplier, 2)
+                            new_bal = round(user["balance"] + win_amount - bet, 2)
+                            update_user(user_id, balance=new_bal, wins=user["wins"] + 1)
+                            res_text = (f"🎉 Победа!\n{res_detail}"
+                                        f"Вы получили: +{win_amount}$ 💵\n"
+                                        f"Чистая прибыль: +{round(win_amount - bet, 2)}$\n\n")
+                        else:
+                            new_bal = round(user["balance"] - bet, 2)
+                            update_user(user_id, balance=new_bal, losses=user["losses"] + 1)
+                            res_text = f"😢 Проигрыш.\n{res_detail}Потеряно: -{bet}$ 💵\n\n"
+
+                        text, kb = get_main_menu(get_user(user_id))
+                        send_message(chat_id, res_text + text, kb)
+
+                except Exception as e:
+                    print("Callback error:", e)
+                continue
+
+            # --- TEXT MESSAGE ---
+            if "message" in update and "text" in update["message"]:
+                msg = update["message"]
+                chat_id = msg["chat"]["id"]
+                text_str = msg["text"].strip()
+                user_id = msg["from"]["id"]
+                first_name = msg["from"].get("first_name", "Игрок")
+                user = get_user(user_id)
+                update_user(user_id, name=first_name)
+
+                if not text_str:
+                    continue
+
+                # /start всегда выводит из состояния
+                cmd = text_str.lower().split()[0]
+                if cmd in ("/start", "/help"):
+                    user_states.pop(user_id, None)
+                    t, k = get_main_menu(get_user(user_id))
+                    send_message(chat_id, t, k)
+                    continue
+
+                state_info = user_states.get(user_id)
+                if state_info:
+                    if isinstance(state_info, tuple) and state_info[0] == "wait_payout_id":
+                        _, amount, state_msg_id = state_info
+                        if text_str.isdigit():
+                            target_id = int(text_str)
+                            del user_states[user_id]
+                            send_message(chat_id, "⏳ Выполняется транзакция...")
+                            send_crypto_payout(chat_id, state_msg_id, amount, target_id)
+                        else:
+                            send_message(chat_id, "❌ ID должен состоять только из цифр. Повторите ввод:")
+                        continue
+
+                    elif isinstance(state_info, tuple):
+                        game, state_msg_id = state_info
+                        try:
+                            bet = float(text_str)
+                        except ValueError:
+                            edit_message(chat_id, state_msg_id, "❌ Введите число цифрами:",
+                                         {"inline_keyboard": [[{"text": "Отмена", "callback_data": f"game_{game}"}]]})
+                            continue
+                        if bet < MIN_BET:
+                            edit_message(chat_id, state_msg_id,
+                                         f"❌ Мин. ставка {MIN_BET}$. Введите другое число:",
+                                         {"inline_keyboard": [[{"text": "Отмена", "callback_data": f"game_{game}"}]]})
+                        elif bet > user["balance"]:
+                            edit_message(chat_id, state_msg_id,
+                                         f"❌ Недостаточно средств (Баланс: {user['balance']}$). Введите другое число:",
+                                         {"inline_keyboard": [[{"text": "Отмена", "callback_data": f"game_{game}"}]]})
+                        else:
+                            del user_states[user_id]
+                            t, k = get_choice_menu(user, game, bet)
+                            edit_message(chat_id, state_msg_id, t, k)
+                        continue
+
+    except Exception as e:
+        print("Main loop error:", e)
+        time.sleep(2)
