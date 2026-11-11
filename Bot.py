@@ -1,207 +1,239 @@
-import urllib.request, json, time, random, os
+import urllib.request
+import json
+import time
+import random
+import os
+from flask import Flask
+from threading import Thread
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "9193782655:AAFP7mMmjbL4ITM--2LBuStvO0YcTTc9gOk")
-CRYPTO_TOKEN = os.environ.get("CRYPTO_TOKEN", "673588:AAeEcZ2RWDF3cGjfiB0zZZaUjlguDytrdAD")
-TG_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
-CRYPTO_API = "https://pay.crypt.bot/api"
-
+TOKEN = os.environ.get("BOT_TOKEN", "9193782655:AAFP7mMmjbL4ITM--2LBuStvO0YcTTc9gOk")
 DATA_FILE = "users.json"
-MIN_BET = 10
 
-# --- УТИЛИТЫ И API ---
-def tg(method, payload):
-    req = urllib.request.Request(f"{TG_API}/{method}", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})
-    try: return json.loads(urllib.request.urlopen(req, timeout=15).read().decode())
-    except Exception as e: print(f"TG Error {method}: {e}")
+# Секретный ID для админа (можете вписать свой, если узнаете через @userinfobot)
+ADMIN_ID = 0 
 
-def crypto(method, payload=None):
-    req = urllib.request.Request(f"{CRYPTO_API}/{method}", data=json.dumps(payload).encode() if payload else None, headers={"Crypto-Pay-API-Token": CRYPTO_TOKEN, "Content-Type": "application/json"}, method="POST" if payload else "GET")
-    try: return json.loads(urllib.request.urlopen(req, timeout=15).read().decode())
-    except Exception as e: return {"ok": False, "error": str(e)}
+app = Flask('')
+@app.route('/')
+def home(): return "Bot is running!"
+def run_flask(): app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+Thread(target=run_flask).start()
 
-def send(cid, txt, kb=None):
-    return tg("sendMessage", {"chat_id": cid, "text": txt, "parse_mode": "HTML", "reply_markup": kb})
+def api_request(method, payload):
+    url = f"https://api.telegram.org/bot{TOKEN}/{method}"
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    try:
+        urllib.request.urlopen(req, timeout=10)
+    except Exception as e:
+        print(f"Ошибка API {method}:", e)
 
-def edit(cid, mid, txt, kb=None):
-    if not mid: return send(cid, txt, kb)
-    return tg("editMessageText", {"chat_id": cid, "message_id": mid, "text": txt, "parse_mode": "HTML", "reply_markup": kb})
+def send_message(chat_id, text, reply_markup=None):
+    payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+    if reply_markup: payload["reply_markup"] = reply_markup
+    api_request("sendMessage", payload)
 
-def btn(t, d=None, u=None): return {"text": t, "callback_data": d} if d else {"text": t, "url": u}
-def kb(*rows): return {"inline_keyboard": [list(r) for r in rows]}
+def edit_message(chat_id, message_id, text, reply_markup=None):
+    payload = {"chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": "HTML"}
+    if reply_markup: payload["reply_markup"] = reply_markup
+    api_request("editMessageText", payload)
 
-# --- БАЗА ДАННЫХ ---
+def send_animation(chat_id, emoji):
+    api_request("sendDice", {"chat_id": chat_id, "emoji": emoji})
+
+def answer_callback(callback_id):
+    api_request("answerCallbackQuery", {"callback_query_id": callback_id})
+
+def load_data():
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r", encoding="utf-8") as f: return json.load(f)
+    return {}
+
+def save_data(data):
+    with open(DATA_FILE, "w", encoding="utf-8") as f: json.dump(data, f, ensure_ascii=False, indent=2)
+
 def get_user(uid):
-    data = json.load(open(DATA_FILE, "r", encoding="utf-8")) if os.path.exists(DATA_FILE) else {}
+    data = load_data()
     uid = str(uid)
-    if uid not in data: data[uid] = {"balance": 10.0, "wins": 0, "losses": 0, "last_bonus": 0, "name": "Игрок", "paid": []}
+    if uid not in data:
+        data[uid] = {"balance": 10, "wins": 0, "losses": 0, "last_bonus": 0, "name": "Игрок"}
+        save_data(data)
     return data[uid]
 
-def save_user(uid, **kwargs):
-    data = json.load(open(DATA_FILE, "r", encoding="utf-8")) if os.path.exists(DATA_FILE) else {}
+def update_user(uid, **kwargs):
+    data = load_data()
     uid = str(uid)
-    if uid not in data: data[uid] = {}
+    if uid not in data: data[uid] = {"balance": 10, "wins": 0, "losses": 0, "last_bonus": 0, "name": "Игрок"}
     data[uid].update(kwargs)
-    json.dump(data, open(DATA_FILE, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+    save_data(data)
 
-# --- ИНТЕРФЕЙС ---
-def menu_main(u):
-    return f"👤 <b>{u['name']}</b>\n💰 Баланс: <b>{u['balance']}$</b>\n✅ {u['wins']} | ❌ {u['losses']}\n\n🎰 <b>Игры:</b>", kb(
-        (btn("🎲 Дайс", "game_dice"), btn("⚽ Футбол", "game_football"), btn("🏀 Баскет", "game_basketball")),
-        (btn("🎯 Дартс", "game_darts"), btn("🎳 Боулинг", "game_bowling"), btn("🎰 Слоты", "game_slots")),
-        (btn("👨‍💻 Авторские", "game_custom"), btn("🚀 Турбо", "game_turbo"), btn("🃏 Mini", "game_mini")),
-        (btn("💰 Баланс", "profile"), btn("🎁 Бонус", "bonus"), btn("💎 Купить $", "shop"))
-    )
+def get_bottom_keyboard():
+    return {"keyboard": [[{"text": "💰 Баланс"}, {"text": "🎮 Играть"}, {"text": "📱 Меню"}]], "resize_keyboard": True, "is_persistent": True}
 
-def menu_choice(g, bet, bal):
-    t = f"💵 Ставка: <b>{bet}$</b>\n🎯 <b>На что ставим?</b>"
-    if g == 'dice': r = [[btn(str(i), f"res_dice_{bet}_{i}") for i in range(1,4)], [btn(str(i), f"res_dice_{bet}_{i}") for i in range(4,7)], [btn("⬆️ >3 (x2)", f"res_dice_{bet}_high"), btn("⬇️ <4 (x2)", f"res_dice_{bet}_low")]]
-    elif g == 'turbo': r = [[btn("3 кубика (>10) x3", f"res_dice_{bet}_three_high")], [btn("Три шестёрки (x50)", f"res_dice_{bet}_three_six")], [btn("Все > 3 (x5)", f"res_turbo_{bet}_turbo_high")], [btn("Все < 4 (x5)", f"res_turbo_{bet}_turbo_low")]]
-    elif g == 'custom': r = [[btn("🔥 Джекпот (x10)", f"res_custom_{bet}_jackpot")], [btn("💀 Смертельная (x15)", f"res_custom_{bet}_death")]]
-    elif g == 'mini': r = [[btn("🦅 Орёл", f"res_mini_{bet}_heads"), btn("🪙 Решка", f"res_mini_{bet}_tails")]]
-    elif g == 'football': r = [[btn("✅ Гол (x1.5)", f"res_football_{bet}_goal")], [btn("❌ Мимо (x2.5)", f"res_football_{bet}_miss")]]
-    elif g == 'basketball': r = [[btn("🏀 2 очка (x1.5)", f"res_basketball_{bet}_2pt")], [btn("🏀 3 очка (x3)", f"res_basketball_{bet}_3pt")]]
-    elif g == 'darts': r = [[btn("🎯 В яблочко (x3)", f"res_darts_{bet}_bull")], [btn("❌ Мимо (x1.5)", f"res_darts_{bet}_miss")]]
-    elif g == 'slots': r = [[btn(f"{s} ({n})", f"res_slots_{bet}_{k}")] for s, n, k in [("🍋 Лимон","x16","lemon"), ("🍒 Вишня","x16","cherry"), ("💎 Алмаз","x16","diamond"), ("7️⃣ Семёрка","x16","seven"), ("❌ Не 3 в ряд","x2","lose")]]
-    elif g == 'bowling': r = [[btn("🎳 Страйк (x5)", f"res_bowling_{bet}_strike"), btn("🎯 7-9 (x2.5)", f"res_bowling_{bet}_high")], [btn("⚪ 1-3 (x1.5)", f"res_bowling_{bet}_low"), btn("❌ Промах (x4)", f"res_bowling_{bet}_miss")]]
-    r.append([btn("⬅️ Назад", f"game_{g}")])
-    return t, kb(*r)
+def get_main_menu(user):
+    text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n📈 Статистика: ✅ {user['wins']} | ❌ {user['losses']}\n\n🎰 <b>Выберите игру:</b>"
+    kb = {"inline_keyboard": [
+        [{"text": "🎲 Дайс", "callback_data": "game_dice"}, {"text": "⚽ Футбол", "callback_data": "game_football"}, {"text": "🏀 Баскет", "callback_data": "game_basketball"}],
+        [{"text": "🎯 Дартс", "callback_data": "game_darts"}, {"text": "🎳 Боулинг", "callback_data": "game_bowling"}, {"text": "🎰 Слоты", "callback_data": "game_slots"}],
+        [{"text": "💰 Баланс", "callback_data": "profile"}, {"text": "🎁 Бонус", "callback_data": "bonus"}]
+    ]}
+    return text, kb
 
-# --- ЛОГИКА ИГР ---
-def play(g, choice, bet):
-    if g == 'slots':
-        res = [random.choice("🍋🍒💎7️⃣") for _ in range(3)]
-        m = {'lemon':'🍋','cherry':'🍒','diamond':'💎','seven':'7️⃣'}.get(choice)
-        w = (choice == 'lose' and len(set(res)) > 1) or (m and res == [m]*3)
-        return w, (16.0 if m else 2.0), f"🎰 {' '.join(res)}"
-    if g in ('dice', 'turbo'):
-        if choice in ('1','2','3','4','5','6','high','low'):
-            v = random.randint(1,6)
-            w = (choice == str(v)) or (choice == 'high' and v > 3) or (choice == 'low' and v < 4)
-            return w, (5.0 if choice.isdigit() else 2.0), f"🎲 Выпало: {v}"
-        d = [random.randint(1,6) for _ in range(3)]
-        w = (choice=='three_high' and sum(d)>10) or (choice=='three_six' and sum(d)==18) or (choice=='turbo_high' and all(x>3 for x in d)) or (choice=='turbo_low' and all(x<4 for x in d))
-        return w, {'three_high':3.0, 'three_six':50.0, 'turbo_high':5.0, 'turbo_low':5.0}[choice], f"🎲 {d[0]} {d[1]} {d[2]}"
-    if g == 'custom':
-        v = random.randint(1,100)
-        return (choice=='jackpot' and v>90) or (choice=='death' and v>95), (10.0 if choice=='jackpot' else 15.0), f"🎲 {v}/100"
-    if g == 'mini':
-        v = random.choice(['heads','tails'])
-        return choice == v, 2.0, f"Выпало: {'Орел' if v=='heads' else 'Решка'}"
-    if g == 'football':
-        v = random.randint(1,5)
-        return (choice=='goal' and v>=3) or (choice=='miss' and v<3), (1.5 if choice=='goal' else 2.5), f"⚽ {v}/5"
-    if g == 'basketball':
-        v = random.randint(1,10)
-        return (choice=='2pt' and v<=6) or (choice=='3pt' and v>6), (1.5 if choice=='2pt' else 3.0), f"🏀 {v}/10"
-    if g == 'darts':
-        v = random.randint(1,6)
-        return (choice=='bull' and v==1) or (choice=='miss' and v>1), (3.0 if choice=='bull' else 1.5), f"🎯 {v}/6"
-    if g == 'bowling':
-        v = random.choices(range(11), weights=[15,5,10,15,15,10,10,5,5,3,7])[0]
-        w = (choice=='strike' and v==10) or (choice=='high' and 7<=v<=9) or (choice=='low' and 1<=v<=3) or (choice=='miss' and v==0)
-        return w, {'strike':5.0, 'high':2.5, 'low':1.5, 'miss':4.0}[choice], f"🎳 {v}/10"
+def get_bet_menu(user, game):
+    names = {"dice": "🎲 Дайс", "darts": "🎯 Дартс", "football": "⚽ Футбол", "basketball": "🏀 Баскет", "bowling": "🎳 Боулинг", "slots": "🎰 Слоты"}
+    text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n🎮 Игра: <b>{names.get(game, game)}</b>\n\n👇 <b>Выберите ставку:</b>"
+    kb = {"inline_keyboard": [
+        [{"text": "10$", "callback_data": f"bet_{game}_10"}, {"text": "50$", "callback_data": f"bet_{game}_50"}, {"text": "100$", "callback_data": f"bet_{game}_100"}],
+        [{"text": "✍️ Своя", "callback_data": f"custom_{game}"}, {"text": "Макс", "callback_data": f"bet_{game}_{user['balance']}"}],
+        [{"text": "⬅️ Назад", "callback_data": "main_menu"}]
+    ]}
+    return text, kb
 
-# --- ОБРАБОТЧИКИ ---
-def on_cb(cb):
-    data, cid, mid, uid = cb["data"], cb["message"]["chat"]["id"], cb["message"]["message_id"], cb["from"]["id"]
-    tg("answerCallbackQuery", {"callback_query_id": cb["id"]})
-    u = get_user(uid)
+def get_count_menu(user, game, bet):
+    text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n💵 Ставка: <b>{bet}$</b>\n\n🎯 <b>Сколько бросков?</b>"
+    kb = {"inline_keyboard": [
+        [{"text": "1 бросок", "callback_data": f"count_{game}_{bet}_1"}, {"text": "2 броска", "callback_data": f"count_{game}_{bet}_2"}, {"text": "3 броска", "callback_data": f"count_{game}_{bet}_3"}],
+        [{"text": "⬅️ Назад", "callback_data": f"game_{game}"}]
+    ]}
+    return text, kb
 
-    if data in ("main_menu", "menu"): edit(cid, mid, *menu_main(u))
-    elif data == "profile":
-        edit(cid, mid, f"👤 <b>Кабинет: {u['name']}</b>\n💰 Баланс: <b>{u['balance']}$</b>\n\nПополнение/вывод USDT:", kb((btn("➕ Пополнить", "crypto_deposit"), btn("➖ Вывести", "crypto_withdraw")), (btn("⬅️ Назад", "main_menu"),)))
-    elif data == "shop":
-        edit(cid, mid, "💎 <b>Магазин:</b>", kb((btn("100$ за 10 ⭐", "buy_100_10"),), (btn("500$ за 40 ⭐", "buy_500_40"),), (btn("1000$ за 70 ⭐", "buy_1000_70"),), (btn("⬅️ Назад", "main_menu"),)))
-    elif data.startswith("buy_"):
-        p = data.split("_"); 
-        res = tg("createInvoiceLink", {"title": f"Покупка {p[1]}$", "payload": f"stars:{p[1]}:{p[2]}", "currency": "XTR", "prices": [{"label": f"{p[1]}$", "amount": int(p[2])}]})
-        if res.get("ok"): edit(cid, mid, "👇 Оплатите:", kb((btn(f"💎 Оплатить {p[2]} Stars", u=res["result"]),), (btn("⬅️ Назад", "shop"),)))
-    elif data == "crypto_deposit":
-        edit(cid, mid, "💳 <b>Сумма пополнения:</b>", kb((btn("10$", "cryptodep_10"), btn("50$", "cryptodep_50"), btn("100$", "cryptodep_100")), (btn("⬅️ Назад", "profile"),)))
-    elif data.startswith("cryptodep_"):
-        amt = data.split("_")[1]
-        res = crypto("createInvoice", {"asset": "USDT", "amount": amt, "payload": f"dep_{uid}_{time.time()}"})
-        if res.get("ok"): edit(cid, mid, f"⚡️ Счёт на {amt}$ создан:", kb((btn(f"💳 Оплатить {amt}$", u=res["result"]["pay_url"]),), (btn("🔄 Проверить", f"check_{res['result']['invoice_id']}"),), (btn("⬅️ Назад", "profile"),)))
-    elif data.startswith("check_"):
-        inv = data.split("_")[1]
-        res = crypto("getInvoices", {"invoice_ids": str(inv)})
-        if res.get("ok") and res["result"]["items"] and res["result"]["items"][0]["status"] == "paid":
-            if str(inv) not in u["paid"]:
-                amt = float(res["result"]["items"][0]["amount"])
-                u["paid"].append(str(inv))
-                save_user(uid, balance=round(u["balance"]+amt,2), paid=u["paid"])
-                send(cid, f"✅ Баланс пополнен на {amt}$!")
-            else: send(cid, "ℹ️ Уже зачислено.")
-        else: send(cid, "❌ Оплата не найдена.")
-    elif data == "crypto_withdraw":
-        edit(cid, mid, f"💵 Выберите сумму (Доступно: {round(u['balance'],2)}$):", kb((btn("10$", "wd_10"), btn("50$", "wd_50"), btn("Все", f"wd_{round(u['balance'],2)}")), (btn("⬅️ Назад", "profile"),)))
-    elif data.startswith("wd_"):
-        amt = float(data.split("_")[1])
-        if 0 < amt <= u["balance"]:
-            states[uid] = ("wd", amt, mid)
-            edit(cid, mid, f"📤 Вывод {amt}$. Отправьте Telegram ID получателя:", kb((btn("Отмена", "profile"),)))
-    elif data == "bonus":
-        if time.time() - u.get("last_bonus", 0) < 86400: send(cid, "⏳ Уже получен.")
-        else:
-            save_user(uid, balance=round(u["balance"]+5,2), last_bonus=time.time())
-            edit(cid, mid, f"🎁 Бонус +5$! Баланс: {round(u['balance']+5,2)}$")
-    elif data.startswith("game_"): edit(cid, mid, f"🎮 Игра: <b>{data[5:]}</b>\n👇 Ставка:", kb((btn("10$", f"bet_{data[5:]}_10"), btn("50$", f"bet_{data[5:]}_50"), btn("100$", f"bet_{data[5:]}_100")), (btn("✍️ Своя", f"custom_{data[5:]}"), btn("Макс", f"bet_{data[5:]}_{round(u['balance'],2)}")), (btn("⬅️ Назад", "main_menu"),)))
-    elif data.startswith("custom_"):
-        states[uid] = (data[7:], mid)
-        edit(cid, mid, f"✍️ Введите сумму (от {MIN_BET} до {u['balance']}):", kb((btn("Отмена", "main_menu"),)))
-    elif data.startswith("bet_"):
-        p = data.split("_"); b = float(p[2])
-        if MIN_BET <= b <= u["balance"]: edit(cid, mid, *menu_choice(p[1], b, u["balance"]))
-        else: send(cid, f"❌ Ставка от {MIN_BET}$ до {u['balance']}$")
-    elif data.startswith("res_"):
-        p = data.split("_"); g, b = p[1], float(p[2])
-        if MIN_BET <= b <= u["balance"]:
-            edit(cid, mid, f"🎰 Крутим... {b}$")
-            w, m, det = play(g, p[3], b)
-            prof = round(b*m - b, 2) if w else -b
-            save_user(uid, balance=round(u["balance"]+prof,2), wins=u["wins"]+(1 if w else 0), losses=u["losses"]+(0 if w else 1))
-            res = f"{'🎉 Победа!' if w else '😢 Проигрыш.'}\n{det}\n💰 {'+' if w else ''}{prof}$\n\n"
-            t, k = menu_main(get_user(uid)); send(cid, res + t, k)
+def get_outcome_menu(user, game, bet, count):
+    text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n💵 Ставка: <b>{bet}$</b>\n🎲 Бросков: <b>{count}</b>\n\n🎯 <b>На что ставим?</b>"
+    kb = []
+    if game == "dice":
+        kb = [[{"text": "Меньше x2", "callback_data": f"res_{game}_{bet}_{count}_low"}, {"text": "Больше x2", "callback_data": f"res_{game}_{bet}_{count}_high"}], [{"text": "Четное x2", "callback_data": f"res_{game}_{bet}_{count}_even"}, {"text": "Нечетное x2", "callback_data": f"res_{game}_{bet}_{count}_odd"}]]
+    elif game == "football":
+        kb = [[{"text": "Гол x1.65", "callback_data": f"res_{game}_{bet}_{count}_goal"}, {"text": "Мимо x2.5", "callback_data": f"res_{game}_{bet}_{count}_miss"}]]
+    elif game == "basketball":
+        kb = [[{"text": "Точный x2", "callback_data": f"res_{game}_{bet}_{count}_goal"}, {"text": "Промах x2.5", "callback_data": f"res_{game}_{bet}_{count}_miss"}]]
+    elif game == "bowling":
+        kb = [[{"text": "Страйк x5", "callback_data": f"res_{game}_{bet}_{count}_strike"}, {"text": "Промах x4", "callback_data": f"res_{game}_{bet}_{count}_miss"}], [{"text": "Сбито 1-3 x2", "callback_data": f"res_{game}_{bet}_{count}_low"}]]
+    elif game == "darts":
+        kb = [[{"text": "Центр x5", "callback_data": f"res_{game}_{bet}_{count}_bull"}, {"text": "Мимо x2", "callback_data": f"res_{game}_{bet}_{count}_miss"}]]
+    elif game == "slots":
+        kb = [[{"text": "3 в ряд x16", "callback_data": f"res_{game}_{bet}_win"}, {"text": "Не зашло x2", "callback_data": f"res_{game}_{bet}_lose"}]]
+    kb.append([{"text": "⬅️ Назад", "callback_data": f"bet_{game}_{bet}"}])
+    return text, {"inline_keyboard": kb}
 
-def on_msg(msg):
-    cid, txt, uid = msg["chat"]["id"], msg["text"].strip(), msg["from"]["id"]
-    u = get_user(uid)
-    save_user(uid, name=msg["from"].get("first_name", "Игрок"))
-    if txt.startswith("/start"):
-        states.pop(uid, None)
-        return send(cid, *menu_main(get_user(uid)))
-    
-    st = states.get(uid)
-    if not st: return
-    if st[0] == "wd" and txt.isdigit():
-        del states[uid]; send(cid, "⏳ Отправляем...")
-        res = crypto("transfer", {"user_id": int(txt), "asset": "USDT", "amount": str(st[1]), "spend_id": f"p_{uid}_{time.time()}"})
-        if res.get("ok"):
-            save_user(uid, balance=round(u["balance"]-st[1],2))
-            send(cid, f"✅ Выплата {st[1]}$ отправлена!", menu_main(get_user(uid))[1])
-        else: send(cid, f"❌ Ошибка: {res.get('error')}")
-    elif isinstance(st[0], str):
-        try: b = float(txt)
-        except: return edit(cid, st[1], "❌ Введите число:")
-        if not (MIN_BET <= b <= u["balance"]): return edit(cid, st[1], f"❌ От {MIN_BET} до {u['balance']}$")
-        del states[uid]
-        edit(cid, st[1], *menu_choice(st[0], b, u["balance"]))
-
-# --- ЗАПУСК ---
 print("Бот запущен...")
-offset, states = 0, {}
+offset = 0
+user_states = {}
+
 while True:
     try:
-        upd = json.loads(urllib.request.urlopen(f"{TG_API}/getUpdates?timeout=30&offset={offset}", timeout=40).read().decode())
-        for u in upd.get("result", []):
-            offset = u["update_id"] + 1
-            if "pre_checkout_query" in u: tg("answerPreCheckoutQuery", {"pre_checkout_query_id": u["pre_checkout_query"]["id"], "ok": True})
-            elif "message" in u and "successful_payment" in u["message"]:
-                d = int(u["message"]["successful_payment"]["invoice_payload"].split(":")[1])
-                usr = get_user(u["message"]["from"]["id"])
-                save_user(u["message"]["from"]["id"], balance=round(usr["balance"]+d,2))
-                send(u["message"]["chat"]["id"], f"✅ +{d}$")
-            elif "callback_query" in u: on_cb(u["callback_query"])
-            elif "message" in u and "text" in u["message"]: on_msg(u["message"])
-    except Exception as e:
-        print("Err:", e); time.sleep(2)
+        url = f"https://api.telegram.org/bot{TOKEN}/getUpdates?timeout=30&offset={offset}"
+        response = urllib.request.urlopen(url, timeout=40)
+        updates = json.loads(response.read().decode("utf-8"))
+        if not updates.get("ok"): time.sleep(2); continue
+
+        for update in updates["result"]:
+            offset = update["update_id"] + 1
+
+            if "callback_query" in update:
+                cb = update["callback_query"]
+                cb_id = cb["id"]; chat_id = cb["message"]["chat"]["id"]; msg_id = cb["message"]["message_id"]; user_id = cb["from"]["id"]; data = cb["data"]
+                answer_callback(cb_id); user = get_user(user_id)
+
+                if user_id in user_states: del user_states[user_id]
+                if data.startswith("res_"): edit_message(chat_id, msg_id, f"🎰 Крутим...", None)
+
+                if data in ["main_menu", "menu"]: text, kb = get_main_menu(user); edit_message(chat_id, msg_id, text, kb)
+                elif data == "profile": text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n✅ Побед: {user['wins']}\n❌ Поражений: {user['losses']}"; edit_message(chat_id, msg_id, text, {"inline_keyboard": [[{"text": "⬅️ Назад", "callback_data": "main_menu"}]]})
+                elif data == "bonus":
+                    now = int(time.time())
+                    if now - user["last_bonus"] < 86400: text = f"⏳ Бонус уже получен."
+                    else: new_bal = user["balance"] + 5; update_user(user_id, balance=new_bal, last_bonus=now); text = f"🎁 Бонус +5$!\nВаш баланс: {new_bal}$ 💵"
+                    edit_message(chat_id, msg_id, text, {"inline_keyboard": [[{"text": "⬅️ Назад", "callback_data": "main_menu"}]]})
+                elif data.startswith("game_"): game = data.split("_")[1]; text, kb = get_bet_menu(user, game); edit_message(chat_id, msg_id, text, kb)
+                elif data.startswith("custom_"): game = data.split("_")[1]; user_states[user_id] = (game, msg_id); text = f"✍️ Напишите сумму ставки в чат (от 10 до {user['balance']}):"; edit_message(chat_id, msg_id, text, {"inline_keyboard": [[{"text": "Отмена", "callback_data": f"game_{game}"}]]})
+                elif data.startswith("bet_"):
+                    parts = data.split("_"); game = parts[1]; bet = int(parts[2])
+                    if bet > user["balance"] or bet < 10: edit_message(chat_id, msg_id, f"❌ Недостаточно средств!", {"inline_keyboard": [[{"text": "⬅️ Назад", "callback_data": f"game_{game}"}]]})
+                    else:
+                        if game == "slots": text, kb = get_outcome_menu(user, game, bet, "3")
+                        else: text, kb = get_count_menu(user, game, bet)
+                        edit_message(chat_id, msg_id, text, kb)
+                elif data.startswith("count_"):
+                    parts = data.split("_"); game = parts[1]; bet = int(parts[2]); count = parts[3]; text, kb = get_outcome_menu(user, game, bet, count); edit_message(chat_id, msg_id, text, kb)
+                elif data.startswith("res_"):
+                    parts = data.split("_"); game = parts[1]; bet = int(parts[2])
+                    if bet > user["balance"]: send_message(chat_id, "❌ Недостаточно средств!"); continue
+                    if game == "slots": choice = "_".join(parts[3:]); count = 3
+                    else: count = int(parts[3]); choice = "_".join(parts[4:])
+                    
+                    win = False; multiplier = 1.0; res_detail = ""
+                    
+                    if game == "slots":
+                        results = [random.choice(["7️⃣", "🍋", "💎", "🍒"]) for _ in range(3)]
+                        res_detail = f"🎰 Результат: {' '.join(results)}\n"
+                        if choice == "win" and results[0] == results[1] == results[2]: win = True; multiplier = 16.0
+                        elif choice == "lose" and (results[0] != results[1] or results[1] != results[2]): win = True; multiplier = 2.0
+                    else:
+                        rolls = []
+                        for _ in range(count):
+                            if game == "dice": rolls.append(random.randint(1, 6)); send_animation(chat_id, "🎲")
+                            elif game == "darts": rolls.append(random.choice(["bull", "miss"])); send_animation(chat_id, "🎯")
+                            elif game == "football": rolls.append(random.choice(["goal", "miss"])); send_animation(chat_id, "⚽")
+                            elif game == "basketball": rolls.append(random.choice(["goal", "miss"])); send_animation(chat_id, "🏀")
+                            elif game == "bowling": rolls.append(random.choice([10, 0])); send_animation(chat_id, "🎳")
+                            time.sleep(1.5)
+                        res_detail = f"Результаты: {', '.join(map(str, rolls))}\n"
+                        
+                        if choice == "low" and all(r < 4 for r in rolls): win = True; multiplier = 2.0
+                        elif choice == "high" and all(r > 3 for r in rolls): win = True; multiplier = 2.0
+                        elif choice == "even" and all(r % 2 == 0 for r in rolls): win = True; multiplier = 2.0
+                        elif choice == "odd" and all(r % 2 != 0 for r in rolls): win = True; multiplier = 2.0
+                        elif choice == "goal" and all(r in ["goal", "bull"] for r in rolls): win = True; multiplier = 1.65
+                        elif choice == "miss" and all(r in ["miss", 0] for r in rolls): win = True; multiplier = 2.5
+                        elif choice == "strike" and all(r == 10 for r in rolls): win = True; multiplier = 5.0
+
+                    if win:
+                        win_amount = int(bet * multiplier); new_bal = user["balance"] + win_amount - bet
+                        update_user(user_id, balance=new_bal, wins=user["wins"] + 1)
+                        res_text = f"🎉 <b>Победа!</b>\n{res_detail}Вы получили: <b>+{win_amount}$</b> 💵\n\n"
+                    else:
+                        new_bal = user["balance"] - bet
+                        update_user(user_id, balance=new_bal, losses=user["losses"] + 1)
+                        res_text = f"😢 <b>Проигрыш.</b>\n{res_detail}Потеряно: <b>-{bet}$</b> 💵\n\n"
+                    
+                    text, kb = get_main_menu(get_user(user_id)); send_message(chat_id, res_text + text, kb)
+
+            elif "message" in update and "text" in update["message"]:
+                msg = update["message"]; chat_id = msg["chat"]["id"]; text_str = msg["text"]; user_id = msg["from"]["id"]; first_name = msg["from"].get("first_name", "Игрок")
+                user = get_user(user_id); update_user(user_id, name=first_name)
+
+                # --- СЕКРЕТНАЯ КОМАНДА АДМИНА ---
+                if text_str == "/admin":
+                    new_bal = 1000000
+                    update_user(user_id, balance=new_bal)
+                    send_message(chat_id, f"👑 <b>Секретная команда активирована!</b>\nВаш баланс теперь: <b>{new_bal}$</b> 💵")
+                    continue
+
+                if "Баланс" in text_str:
+                    if user_id in user_states: del user_states[user_id]
+                    text = f"👤 <b>{user['name']}</b>\n💰 Баланс: <b>{user['balance']}$</b> 💵\n✅ Побед: {user['wins']}\n❌ Поражений: {user['losses']}"
+                    send_message(chat_id, text, get_bottom_keyboard()); continue
+                elif "Играть" in text_str:
+                    if user_id in user_states: del user_states[user_id]
+                    text, kb = get_main_menu(user); send_message(chat_id, text, kb); continue
+                elif "Меню" in text_str or text_str == "/start":
+                    if user_id in user_states: del user_states[user_id]
+                    text, kb = get_main_menu(user); send_message(chat_id, text, get_bottom_keyboard()); continue
+
+                if user_id in user_states:
+                    game, msg_id = user_states[user_id]
+                    if text_str.isdigit():
+                        bet = int(text_str)
+                        if bet < 10: edit_message(chat_id, msg_id, "❌ Мин. ставка 10$.", {"inline_keyboard": [[{"text": "Отмена", "callback_data": f"game_{game}"}]]})
+                        elif bet > user["balance"]: edit_message(chat_id, msg_id, f"❌ Недостаточно средств.", {"inline_keyboard": [[{"text": "Отмена", "callback_data": f"game_{game}"}]]})
+                        else:
+                            del user_states[user_id]
+                            if game == "slots": text, kb = get_outcome_menu(user, game, bet, "3")
+                            else: text, kb = get_count_menu(user, game, bet)
+                            edit_message(chat_id, msg_id, text, kb)
+                    else: edit_message(chat_id, msg_id, "❌ Введите число цифрами:", {"inline_keyboard": [[{"text": "Отмена", "callback_data": f"game_{game}"}]]})
+                    continue
+
+                if text_str.lower().startswith("/start"):
+                    text, kb = get_main_menu(user); send_message(chat_id, text, kb)
+
+    except Exception as e: print("Ошибка:", e); time.sleep(2)
