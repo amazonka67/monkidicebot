@@ -3,20 +3,9 @@ import json
 import time
 import random
 import os
-from flask import Flask
-from threading import Thread
 
 TOKEN = os.environ.get("BOT_TOKEN", "9193782655:AAFP7mMmjbL4ITM--2LBuStvO0YcTTc9gOk")
 DATA_FILE = "users.json"
-
-# Секретный ID для админа (можете вписать свой, если узнаете через @userinfobot)
-ADMIN_ID = 0 
-
-app = Flask('')
-@app.route('/')
-def home(): return "Bot is running!"
-def run_flask(): app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
-Thread(target=run_flask).start()
 
 def api_request(method, payload):
     url = f"https://api.telegram.org/bot{TOKEN}/{method}"
@@ -201,7 +190,6 @@ while True:
                 msg = update["message"]; chat_id = msg["chat"]["id"]; text_str = msg["text"]; user_id = msg["from"]["id"]; first_name = msg["from"].get("first_name", "Игрок")
                 user = get_user(user_id); update_user(user_id, name=first_name)
 
-                # --- СЕКРЕТНАЯ КОМАНДА АДМИНА ---
                 if text_str == "/admin":
                     new_bal = 1000000
                     update_user(user_id, balance=new_bal)
