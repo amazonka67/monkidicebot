@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Достопримечательности Илишевского района</title>
+
+  <!-- Красивый шрифт -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Иконки Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- Карты Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+      display: flex;
+      height: 100vh;
+      color: #1a1a1a;
+      background: #f0f2f5;
+    }
+
+    /* ЛЕВАЯ ПАНЕЛЬ */
+    #sidebar {
+      width: 400px;
+      background: #fff;
+      border-right: 1px solid #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #sidebar h1 {
+      font-size: 1.15rem;
+      padding: 18px 20px;
+      background: linear-gradient(135deg, #1e3a5f, #2c5282);
+      color: #fff;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    #sidebar h1 i { font-size: 1.15rem; }
+
+    /* ФИЛЬТРЫ */
+    #filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 12px;
+      border-bottom: 1px solid #eee;
+      background: #fafafa;
+    }
+    .filter-chip {
+      font-family: inherit;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 7px 12px;
+      border: 1.5px solid transparent;
+      border-radius: 20px;
+      background: #eef1f5;
+      color: #555;
+      cursor: pointer;
+      transition: 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .filter-chip:hover { background: #e0e5ec; }
+    .filter-chip.active {
+      background: #1e3a5f;
+      color: #fff;
+      border-color: #1e3a5f;
+    }
+    .filter-chip i { font-size: 0.75rem; color: var(--chip-color, #555); }
+    .filter-chip.active i { color: #fff; }
+
+    /* СПИСОК */
+    #places-list { flex: 1; overflow-y: auto; padding: 10px; }
+    .place-item {
+      background: #fff;
+      border: 1px solid #eee;
+      border-left: 4px solid #ccc;
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .place-item:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      transform: translateX(3px);
+    }
+    .place-item .category-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #fff;
+      padding: 3px 9px;
+      border-radius: 10px;
+      margin-bottom: 8px;
+    }
+    .place-item h3 {
+      font-size: 0.98rem;
+      margin-bottom: 6px;
+      color: #1a1a1a;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+    .place-item p {
+      font-size: 0.82rem;
+      color: #555;
+      line-height: 1.45;
+      margin-bottom: 8px;
+    }
+    .place-item .address {
+      font-size: 0.75rem;
+      color: #888;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    /* КАРТА */
+    #map { flex: 1; height: 100vh; }
+    .leaflet-popup-content { font-family: 'Manrope', sans-serif; font-size: 0.88rem; line-height: 1.45; }
+    .leaflet-popup-content strong { font-size: 1rem; display: block; margin-top: 8px; }
+
+    /* МОБИЛЬНЫЙ */
+    @media (max-width: 700px) {
+      body { flex-direction: column; }
+      #sidebar { width: 100%; height: 45vh; }
+      #map { height: 55vh; }
+    }
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <h1><i class="fa-solid fa-map-location-dot"></i> Илишевский район</h1>
+    <div id="filters"></div>
+    <div id="places-list"></div>
+  </div>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    /* ---------- 1. КАТЕГОРИИ (цвет + иконка для каждой) ---------- */
+    const categories = {
+      museum:     { label: 'Музеи',      color: '#8e44ad', icon: 'fa-landmark' },
+      monument:   { label: 'Памятники',  color: '#e67e22', icon: 'fa-monument' },
+      nature:     { label: 'Природа',    color: '#27ae60', icon: 'fa-tree' },
+      temple:     { label: 'Храмы',      color: '#2980b9', icon: 'fa-church' },
+      archeology: { label: 'Археология', color: '#8b4513', icon: 'fa-shovel' }
+    };
+
+    /* ---------- 2. ДОСТОПРИМЕЧАТЕЛЬНОСТИ ---------- */
+    const places = [
+      {
+        name: "Музей дважды Героя Советского Союза М. Г. Гареева",
+        category: "museum",
+        description: "Открыт 8 июля 1992 года в центре села Верхнеяркеево. Два зала рассказывают о жизни и боевом пути лётчика-штурмовика Мусы Гареева. Перед зданием — бронзовый бюст героя.",
+        address: "с. Верхнеяркеево, ул. Советская, 41",
+        coords: [55.4458, 54.3168]
+      },
+      {
+        name: "Памятник Мусе Гарееву",
+        category: "monument",
+        description: "Установлен в декабре 2024 года в честь единственного в Башкортостане дважды Героя Советского Союза. Расположен вблизи трассы М-12 «Восток».",
+        address: "Илишевский район (у трассы М-12)",
+        coords: [55.4458, 54.3168]
+      },
+      {
+        name: "Мемориал «Скорбящая мать»",
+        category: "monument",
+        description: "Обелиск в селе Базитамак, посвящённый памяти погибших в Великой Отечественной войне.",
+        address: "с. Базитамак",
+        coords: [55.6474, 54.5361]
+      },
+      {
+        name: "Церковь Иоанна Предтечи",
+        category: "temple",
+        description: "Единственная постоянно действующая церковь на Илишевской земле. Каменный храм в честь Усекновения главы Иоанна Предтечи начали возводить в начале XIX века.",
+        address: "с. Андреевка, ул. Советская, 45",
+        coords: [55.6963, 54.3887]
+      },
+      {
+        name: "Озеро Татыш",
+        category: "nature",
+        description: "Одно из крупнейших и древнейших озёр северо-запада Башкирии, памятник природы с 1965 года. Занесено в Красную книгу Республики Башкортостан.",
+        address: "окрестности с. Старотатышево",
+        coords: [55.7407, 54.2084]
+      },
+      {
+        name: "Реликтовый сосновый бор",
+        category: "nature",
+        description: "Сосновый бор вдоль реки Белой у деревни Восток. Возраст некоторых деревьев превышает 150 лет. Один из значимых памятников природы района.",
+        address: "д. Восток",
+        coords: [55.6308, 54.6341]
+      },
+      {
+        name: "Родник «Салкын чишма» (Холодный родник)",
+        category: "nature",
+        description: "Известный родник с чистой, мягкой водой, богатой минералами. Местные жители считают воду целебной. В 2015 году родник благоустроили: лестницы, мостик, купальни, беседка и освещение.",
+        address: "близ с. Урметово",
+        coords: [55.3234, 54.2495]
+      },
+      {
+        name: "Городище Петер-Тау (Юлдашевское)",
+        category: "archeology",
+        description: "Археологический памятник середины 1-го тысячелетия до н. э. — начала н. э. Расположен в устье реки Сюнь, в 2,5–3 км от деревни Верхнее Юлдашево. Открыто в 1894 году.",
+        address: "окрестности д. Верхнее Юлдашево",
+        coords: [55.6867, 54.2710]
+      },
+      {
+        name: "Ханское кладбище «Хан зыяраты»",
+        category: "archeology",
+        description: "Старинное кладбище, связанное с легендами о ханских захоронениях. Находится возле деревни Кипчаково.",
+        address: "возле д. Кипчаково",
+        coords: [55.5806, 54.0775]
+      },
+      {
+        name: "Стоянки первобытных людей",
+        category: "archeology",
+        description: "Археологические памятники каменного века около села Итеево. Свидетельствуют о древнейшем заселении территории района.",
+        address: "окрестности с. Итеево",
+        coords: [55.5226, 54.4561]
+      },
+      {
+        name: "Семейный мавзолей",
+        category: "monument",
+        description: "Историко-культурный объект в селе Ябалаково. Входит в экскурсионные маршруты по району.",
+        address: "с. Ябалаково",
+        coords: [55.6676, 54.2367]
+      },
+      {
+        name: "Музей поэта Р. М. Миннулина",
+        category: "museum",
+        description: "Музей заслуженного работника культуры Башкортостана и Татарстана, поэта Р. М. Миннулина, расположен на его родине — в деревне Шамметово.",
+        address: "д. Шамметово",
+        coords: [55.5882, 54.1265]
+      }
+    ];
+
+    /* ---------- 3. КАРТА ---------- */
+    const map = L.map('map').setView([55.6, 54.3], 10);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors',
+      maxZoom: 19
+    }).addTo(map);
+
+    /* ---------- 4. ЦВЕТНЫЕ МАРКЕРЫ ---------- */
+    const markers = [];
+
+    places.forEach((place) => {
+      const cat = categories[place.category];
+      // Круглый цветной маркер вместо стандартной "капли"
+      const marker = L.circleMarker(place.coords, {
+        radius: 9,
+        fillColor: cat.color,
+        color: '#ffffff',
+        weight: 2.5,
+        opacity: 1,
+        fillOpacity: 0.95
+      })
+      .addTo(map)
+      .bindPopup(`
+        <span style="background:${cat.color}; color:#fff; padding:2px 8px; border-radius:8px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">
+          ${cat.label}
+        </span>
+        <strong>${place.name}</strong>
+        <em style="color:#888; font-style:normal; font-size:0.82rem;">${place.address}</em><br><br>
+        ${place.description}
+      `);
+      markers.push(marker);
+    });
+
+    /* ---------- 5. ФИЛЬТРЫ ---------- */
+    const filtersEl = document.getElementById('filters');
+    const listEl = document.getElementById('places-list');
+    let activeFilter = 'all';
+
+    function createChip(filterKey, label, color, icon) {
+      const chip = document.createElement('button');
+      chip.className = 'filter-chip';
+      chip.dataset.filter = filterKey;
+      if (color) chip.style.setProperty('--chip-color', color);
+      chip.innerHTML = filterKey === 'all'
+        ? '<i class="fa-solid fa-layer-group"></i> Все'
+        : `<i class="fa-solid ${icon}"></i> ${label}`;
+      chip.addEventListener('click', () => applyFilter(filterKey));
+      filtersEl.appendChild(chip);
+    }
+
+    createChip('all', 'Все', null, null);
+    Object.entries(categories).forEach(([key, cat]) => {
+      createChip(key, cat.label, cat.color, cat.icon);
+    });
+
+    function applyFilter(filter) {
+      activeFilter = filter;
+
+      // Подсветка активной кнопки
+      document.querySelectorAll('.filter-chip').forEach(chip => {
+        chip.classList.toggle('active', chip.dataset.filter === filter);
+      });
+
+      // Скрываем / показываем маркеры на карте
+      markers.forEach((marker, index) => {
+        const place = places[index];
+        const shouldShow = filter === 'all' || place.category === filter;
+        if (shouldShow) {
+          if (!map.hasLayer(marker)) marker.addTo(map);
+        } else {
+          if (map.hasLayer(marker)) map.removeLayer(marker);
+        }
+      });
+
+      // Перерисовываем список
+      renderList();
+    }
+
+    /* ---------- 6. СПИСОК ---------- */
+    function renderList() {
+      listEl.innerHTML = '';
+
+      places.forEach((place, index) => {
+        if (activeFilter !== 'all' && place.category !== activeFilter) return;
+
+        const cat = categories[place.category];
+        const item = document.createElement('div');
+        item.className = 'place-item';
+        item.style.borderLeftColor = cat.color;
+        item.innerHTML = `
+          <span class="category-tag" style="background:${cat.color};">
+            <i class="fa-solid ${cat.icon}"></i> ${cat.label}
+          </span>
+          <h3>${place.name}</h3>
+          <p>${place.description.substring(0, 100)}…</p>
+          <div class="address"><i class="fa-solid fa-location-dot"></i> ${place.address}</div>
+        `;
+
+        item.addEventListener('click', () => {
+          map.setView(place.coords, 14);
+          markers[index].openPopup();
+        });
+
+        listEl.appendChild(item);
+      });
+    }
+
+    renderList();
+    setTimeout(() => map.invalidateSize(), 100);
+  </script>
+</body>
+</html>
