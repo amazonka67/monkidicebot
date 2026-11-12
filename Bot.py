@@ -5,7 +5,7 @@ import random
 import os
 
 TOKEN = os.environ.get("BOT_TOKEN", "9193782655:AAFP7mMmjbL4ITM--2LBuStvO0YcTTc9gOk")
-DATA_FILE = "/app/users.json" # Сохраняем в папку /app
+DATA_FILE = "/app/users.json"
 
 def api_request(method, payload):
     url = f"https://api.telegram.org/bot{TOKEN}/{method}"
@@ -130,8 +130,7 @@ while True:
 
                 if user_id in user_states: del user_states[user_id]
                 
-                if data.startswith("res_"): 
-                    edit_message(chat_id, msg_id, f"🎰 Крутим...", None)
+                if data.startswith("res_"): edit_message(chat_id, msg_id, f"🎰 Крутим...", None)
 
                 if data == "daily_chest":
                     now = int(time.time())
