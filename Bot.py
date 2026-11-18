@@ -5,7 +5,7 @@ import random
 import os
 
 TOKEN = os.environ.get("BOT_TOKEN", "9193782655:AAFP7mMmjbL4ITM--2LBuStvO0YcTTc9gOk")
-WEBAPP_URL = "https://amazonka67.github.io/monkidicebot/" 
+WEBAPP_URL = "https://amazonka67.github.io/monkidicebot/?v=2"
 
 def api_request(method, payload):
     url = f"https://api.telegram.org/bot{TOKEN}/{method}"
