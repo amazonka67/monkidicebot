@@ -3,90 +3,149 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MonkiDice App</title>
+    <title>MonkiDice</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #1a1a1a; /* Темный фон как в Rakes */
-            color: white;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-        }
-        .card {
-            background: #2a2a2a;
-            padding: 20px;
-            border-radius: 15px;
-            text-align: center;
-            width: 80%;
-            max-width: 400px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-        }
-        h1 { margin: 0 0 10px 0; font-size: 24px; }
-        .balance { font-size: 32px; color: #4ade80; margin: 15px 0; font-weight: bold; }
-        .btn {
-            background-color: #3b82f6;
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            font-size: 18px;
-            border-radius: 10px;
-            cursor: pointer;
-            width: 100%;
-            margin-top: 10px;
-            font-weight: bold;
-            transition: 0.2s;
-        }
-        .btn:active { transform: scale(0.95); }
-        .btn-game { background-color: #8b5cf6; }
+        body { margin: 0; padding: 0; background-color: #1a1a1a; color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; user-select: none; }
+        .header { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; box-sizing: border-box; background-color: #111; }
+        .balance-pill { background-color: #222; padding: 5px 15px; border-radius: 20px; font-weight: bold; display: flex; align-items: center; gap: 10px; }
+        .avatar { background-color: #4ade80; color: #000; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        
+        .main-container { flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; padding: 20px; box-sizing: border-box; }
+        .wheel-container { position: relative; width: 300px; height: 300px; margin-bottom: 20px; }
+        .wheel { width: 100%; height: 100%; border-radius: 50%; background: conic-gradient(#3b82f6 0deg 36deg, #f59e0b 36deg 72deg, #10b981 72deg 108deg, #ef4444 108deg 144deg, #8b5cf6 144deg 180deg, #3b82f6 180deg 216deg, #f59e0b 216deg 252deg, #10b981 252deg 288deg, #ef4444 288deg 324deg, #8b5cf6 324deg 360deg); border-radius: 50%; border: 5px solid #333; transition: transform 3s cubic-bezier(0.25, 1, 0.5, 1); box-shadow: 0 0 20px rgba(0,0,0,0.8) inset; }
+        .pointer { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 25px solid white; z-index: 10; }
+        
+        .bet-panel { background-color: #222; width: 100%; max-width: 400px; border-radius: 15px; padding: 15px; box-sizing: border-box; margin-bottom: 20px; }
+        .bet-header { font-size: 12px; color: #888; margin-bottom: 5px; text-align: left; }
+        .bet-controls { display: flex; justify-content: space-between; align-items: center; background-color: #111; border-radius: 10px; padding: 10px; margin-bottom: 10px; }
+        .bet-btn { background: none; border: none; color: white; font-size: 24px; cursor: pointer; padding: 0 15px; }
+        .bet-value { font-size: 24px; font-weight: bold; flex-grow: 1; text-align: center; }
+        .quick-bets { display: flex; gap: 10px; }
+        .quick-btn { flex: 1; background-color: #333; color: white; border: none; padding: 10px; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        
+        .multipliers { display: flex; gap: 10px; width: 100%; max-width: 400px; justify-content: space-between; }
+        .mult-btn { flex: 1; border: none; padding: 15px 0; border-radius: 10px; font-size: 18px; font-weight: bold; color: white; cursor: pointer; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
+        .m-x2 { background: linear-gradient(180deg, #3b82f6, #2563eb); }
+        .m-x3 { background: linear-gradient(180deg, #f59e0b, #d97706); }
+        .m-x5 { background: linear-gradient(180deg, #10b981, #059669); }
+        .m-x50 { background: linear-gradient(180deg, #ef4444, #dc2626); }
+
+        .nav-bar { width: 100%; background-color: #111; display: flex; justify-content: space-around; padding: 15px 0 25px 0; border-top-left-radius: 20px; border-top-right-radius: 20px; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; color: #666; font-size: 12px; cursor: pointer; }
+        .nav-item.active { color: #4ade80; }
+        .nav-icon { font-size: 20px; margin-bottom: 5px; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h1 id="username">Загрузка...</h1>
-        <div class="balance" id="balance">0 $</div>
-        <button class="btn" onclick="claimBonus()">🎁 Забрать бонус</button>
-        <button class="btn btn-game" onclick="playDice()">🎲 Играть в Дайс</button>
+    <div class="header">
+        <div style="font-size: 20px; font-weight: bold; font-style: italic;">⚔️ MonkiDice</div>
+        <div class="balance-pill"><span style="color: #4ade80;">+</span> <span id="balance">150.00</span> T</div>
+        <div class="avatar" id="avatar">U</div>
+    </div>
+
+    <div class="main-container">
+        <div class="wheel-container">
+            <div class="pointer"></div>
+            <div class="wheel" id="wheel"></div>
+        </div>
+
+        <div class="bet-panel">
+            <div class="bet-header">СТАВКА</div>
+            <div class="bet-controls">
+                <button class="bet-btn" onclick="changeBet(-10)">−</button>
+                <div class="bet-value" id="bet-amount">10.00</div>
+                <button class="bet-btn" onclick="changeBet(10)">+</button>
+            </div>
+            <div class="quick-bets">
+                <button class="quick-btn" onclick="setBet('half')">½</button>
+                <button class="quick-btn" onclick="setBet('double')">x2</button>
+                <button class="quick-btn" onclick="setBet('max')">MAX</button>
+            </div>
+        </div>
+
+        <div class="multipliers">
+            <button class="mult-btn m-x2" onclick="playGame(2)">x2</button>
+            <button class="mult-btn m-x3" onclick="playGame(3)">x3</button>
+            <button class="mult-btn m-x5" onclick="playGame(5)">x5</button>
+            <button class="mult-btn m-x50" onclick="playGame(50)">x50</button>
+        </div>
+    </div>
+
+    <div class="nav-bar">
+        <div class="nav-item active"><div class="nav-icon">📈</div>Лобби</div>
+        <div class="nav-item"><div class="nav-icon">🎯</div>Jackpot</div>
+        <div class="nav-item"><div class="nav-icon">♠️</div>Poker</div>
+        <div class="nav-item"><div class="nav-icon">👤</div>Профиль</div>
     </div>
 
     <script>
-        // Инициализация Telegram WebApp
         const tg = window.Telegram.WebApp;
-        tg.expand(); // Разворачиваем на весь экран
-        tg.ready();
+        tg.expand(); tg.ready();
 
-        // Данные пользователя
         const user = tg.initDataUnsafe?.user;
-        if (user) {
-            document.getElementById('username').innerText = user.first_name;
+        if (user) document.getElementById('avatar').innerText = user.first_name[0];
+
+        let balance = 150.00;
+        let currentBet = 10.00;
+        let isSpinning = false;
+
+        function updateUI() {
+            document.getElementById('balance').innerText = balance.toFixed(2);
+            document.getElementById('bet-amount').innerText = currentBet.toFixed(2);
         }
 
-        // Фейковый баланс для теста (потом будем брать с сервера)
-        let currentBalance = 150;
-        document.getElementById('balance').innerText = currentBalance + ' $';
-
-        // Функция для отправки данных боту
-        function sendDataToBot(action) {
-            tg.sendData(JSON.stringify({ action: action, user_id: user.id }));
+        function changeBet(amount) {
+            currentBet += amount;
+            if (currentBet < 1) currentBet = 1;
+            if (currentBet > balance) currentBet = balance;
+            updateUI();
         }
 
-        function claimBonus() {
-            // Здесь мы потом будем запрашивать бонус у сервера
-            currentBalance += 10;
-            document.getElementById('balance').innerText = currentBalance + ' $';
-            tg.showAlert("Вы получили 10$!");
+        function setBet(type) {
+            if (type === 'half') currentBet = currentBet / 2;
+            else if (type === 'double') currentBet = currentBet * 2;
+            else if (type === 'max') currentBet = balance;
+            if (currentBet < 1) currentBet = 1;
+            if (currentBet > balance) currentBet = balance;
+            updateUI();
         }
 
-        function playDice() {
-            tg.showAlert("Игра в разработке, но данные уже улетели боту!");
-            // Отправляем команду боту, чтобы он знал, что нажали на Дайс
-            sendDataToBot("play_dice");
+        function playGame(selectedMultiplier) {
+            if (isSpinning) return;
+            if (currentBet > balance) { tg.showAlert("Недостаточно средств!"); return; }
+
+            isSpinning = true;
+            balance -= currentBet;
+            updateUI();
+
+            let winChance = 0;
+            if (selectedMultiplier === 2) winChance = 45; 
+            else if (selectedMultiplier === 3) winChance = 30; 
+            else if (selectedMultiplier === 5) winChance = 15; 
+            else if (selectedMultiplier === 50) winChance = 2; 
+
+            const isWin = Math.random() * 100 < winChance;
+            const wheel = document.getElementById('wheel');
+            const randomDegrees = Math.floor(Math.random() * 360) + 1800; 
+            wheel.style.transform = `rotate(${randomDegrees}deg)`;
+
+            setTimeout(() => {
+                if (isWin) {
+                    const winAmount = currentBet * selectedMultiplier;
+                    balance += winAmount;
+                    tg.showAlert(`Поздравляем! Вы выиграли ${winAmount.toFixed(2)} T!`);
+                } else {
+                    tg.showAlert("Вы проиграли.");
+                }
+                updateUI();
+                isSpinning = false;
+                setTimeout(() => { wheel.style.transition = 'none'; wheel.style.transform = 'rotate(0deg)'; }, 100);
+                setTimeout(() => { wheel.style.transition = 'transform 3s cubic-bezier(0.25, 1, 0.5, 1)'; }, 200);
+            }, 3100); 
         }
+
+        updateUI();
     </script>
 </body>
 </html>
