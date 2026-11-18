@@ -32,9 +32,6 @@
         .m-x5 { background: linear-gradient(180deg, #10b981, #059669); }
         .m-x50 { background: linear-gradient(180deg, #ef4444, #dc2626); }
 
-        .tab-content { display: none; width: 100%; flex-direction: column; align-items: center; flex-grow: 1; justify-content: center; }
-        .tab-content.active { display: flex; }
-
         .nav-bar { width: 100%; background-color: #111; display: flex; justify-content: space-around; padding: 15px 0 25px 0; border-top-left-radius: 20px; border-top-right-radius: 20px; z-index: 20;}
         .nav-item { display: flex; flex-direction: column; align-items: center; color: #666; font-size: 12px; cursor: pointer; }
         .nav-item.active { color: #4ade80; }
@@ -48,7 +45,7 @@
         <div class="avatar" id="avatar">U</div>
     </div>
 
-    <div class="tab-content active" id="tab-lobby">
+    <div class="main-container">
         <div class="wheel-container">
             <div class="pointer"></div>
             <div class="wheel" id="wheel"></div>
@@ -76,15 +73,11 @@
         </div>
     </div>
 
-    <div class="tab-content" id="tab-jackpot"><h1>JACKPOT</h1></div>
-    <div class="tab-content" id="tab-poker"><h1>POKER</h1></div>
-    <div class="tab-content" id="tab-profile"><h1>ПРОФИЛЬ</h1></div>
-
     <div class="nav-bar">
-        <div class="nav-item active" onclick="switchTab('lobby', this)"><div class="nav-icon">📈</div>Лобби</div>
-        <div class="nav-item" onclick="switchTab('jackpot', this)"><div class="nav-icon">🎯</div>Jackpot</div>
-        <div class="nav-item" onclick="switchTab('poker', this)"><div class="nav-icon">♠️</div>Poker</div>
-        <div class="nav-item" onclick="switchTab('profile', this)"><div class="nav-icon">👤</div>Профиль</div>
+        <div class="nav-item active"><div class="nav-icon">📈</div>Лобби</div>
+        <div class="nav-item"><div class="nav-icon">🎯</div>Jackpot</div>
+        <div class="nav-item"><div class="nav-icon">♠️</div>Poker</div>
+        <div class="nav-item"><div class="nav-icon">👤</div>Профиль</div>
     </div>
 
     <script>
@@ -97,34 +90,22 @@
         let currentBet = 10.00;
         let isSpinning = false;
 
-        // Генерация колеса с 50 секторами
-        // 2 сектора x50, остальные распределены
-        let wheelSectors = Array(50).fill('x2'); // База x2
-        wheelSectors[0] = 'x50'; wheelSectors[25] = 'x50'; // 2 сектора x50
+        // Генерация колеса (50 секторов)
+        let wheelSectors = Array(50).fill('x2'); 
+        wheelSectors[0] = 'x50'; wheelSectors[25] = 'x50'; 
         
-        // Добавляем цвета
         let gradientParts = [];
         for (let i = 0; i < 50; i++) {
             let deg = i * 7.2;
             let nextDeg = (i + 1) * 7.2;
-            let color = "#3b82f6"; // Синий (x2)
-            if (wheelSectors[i] === 'x50') color = "#ef4444";
-            else if (i % 3 === 0) { color = "#f59e0b"; wheelSectors[i] = 'x3'; }
-            else if (i % 5 === 0) { color = "#10b981"; wheelSectors[i] = 'x5'; }
-            
+            let color = "#3b82f6"; // Синий
+            if (wheelSectors[i] === 'x50') color = "#ef4444"; // Красный
+            else if (i % 3 === 0) color = "#f59e0b"; // Оранжевый
+            else if (i % 5 === 0) color = "#10b981"; // Зеленый
             gradientParts.push(`${color} ${deg}deg ${nextDeg}deg`);
         }
-        
         const wheel = document.getElementById('wheel');
         wheel.style.background = `conic-gradient(${gradientParts.join(', ')})`;
-
-        // Переключение вкладок
-        function switchTab(tabId, el) {
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            document.getElementById('tab-' + tabId).classList.add('active');
-            el.classList.add('active');
-        }
 
         function updateUI() {
             document.getElementById('balance').innerText = balance.toFixed(2);
@@ -155,18 +136,21 @@
             balance -= currentBet;
             updateUI();
 
-            // Логика выигрыша: если выбран x50, то шанс 2/50 (4%)
+            // **ИСПРАВЛЕННАЯ МАТЕМАТИКА**
+            // Теперь шанс выигрыша четко зависит от кнопки (шанс обратно пропорционален множителю)
             let isWin = false;
-            let finalMult = 1;
+            let winChance = 0;
+            
+            if (selectedMultiplier === 2) winChance = 45; 
+            else if (selectedMultiplier === 3) winChance = 30; 
+            else if (selectedMultiplier === 5) winChance = 15; 
+            else if (selectedMultiplier === 50) winChance = 2; 
 
-            if (selectedMultiplier === 50) {
-                // Игрок ставит на x50. Выигрывает только если выпадет сектор x50
-                let randomSector = Math.floor(Math.random() * 50);
-                if (wheelSectors[randomSector] === 'x50') { isWin = true; finalMult = 50; }
-            } else {
-                // Игрок ставит на x2, x3, x5. Шанс ~50%, но выплата по выбранному коэффициенту
-                isWin = Math.random() < 0.45; 
-                finalMult = selectedMultiplier;
+            // Генерируем случайное число от 1 до 100
+            let roll = Math.random() * 100;
+            
+            if (roll <= winChance) {
+                isWin = true;
             }
 
             const randomDegrees = Math.floor(Math.random() * 360) + 3600; 
@@ -174,11 +158,11 @@
 
             setTimeout(() => {
                 if (isWin) {
-                    const winAmount = currentBet * finalMult;
+                    const winAmount = currentBet * selectedMultiplier;
                     balance += winAmount;
-                    tg.showAlert(`Поздравляем! Вы выиграли ${winAmount.toFixed(2)} T! (x${finalMult})`);
+                    tg.showAlert(`🎉 ПОБЕДА! Вы выиграли ${winAmount.toFixed(2)} T!`);
                 } else {
-                    tg.showAlert("Вы проиграли.");
+                    tg.showAlert("😢 Вы проиграли.");
                 }
                 updateUI();
                 isSpinning = false;
